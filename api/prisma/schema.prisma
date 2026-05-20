@@ -14,27 +14,38 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  role          Role      @default(USER)
-  sessions      Session[]
-  accounts      Account[]
-
-  @@unique([email])
-  @@map("user")
-}
-
 enum Role {
   STUDENT
   TEACHER
   USER
   ADMIN
+}
+
+enum EvaluationType {
+  EXAM
+  QUIZ
+  PROJECT
+}
+
+model User {
+  id                String             @id
+  name              String
+  email             String
+  emailVerified     Boolean            @default(false)
+  image             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  role              Role               @default(USER)
+  sessions          Session[]
+  accounts          Account[]
+  courses           Course[]
+  enrollments       Enrollment[]
+  grades            Grade[]            @relation("StudentGrades")
+  createdGrades     Grade[]            @relation("GradesCreated")
+  attendanceRecords AttendanceRecord[]
+
+  @@unique([email])
+  @@map("user")
 }
 
 model Session {
@@ -83,4 +94,91 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model Course {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  capacity    Int
+  semester    String
+
+  teacherId String?
+  teacher   User?   @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  evaluationWeights EvaluationWeight[]
+
+  enrollments Enrollment[]
+
+  grades             Grade[]
+  attendanceSessions AttendanceSession[]
+}
+
+model EvaluationWeight {
+  id     String         @id @default(uuid())
+  type   EvaluationType
+  weight Float
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, type])
+}
+
+model Enrollment {
+  id String @id @default(uuid())
+
+  studentId String
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  enrolledAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([studentId, courseId])
+}
+
+model Grade {
+  id             String         @id @default(uuid())
+  evaluationType EvaluationType
+  value          Float
+
+  studentId String
+  student   User   @relation("StudentGrades", fields: [studentId], references: [id], onDelete: Restrict)
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  createdById String?
+  createdBy   User?   @relation("GradesCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AttendanceSession {
+  id                String             @id @default(uuid())
+  date              DateTime
+  courseId          String
+  course            Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  attendanceRecords AttendanceRecord[]
+
+  @@unique([courseId, date])
+}
+
+model AttendanceRecord {
+  id        String            @id @default(uuid())
+  present   Boolean
+  sessionId String
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User              @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, studentId])
 }
