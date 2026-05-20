@@ -7,6 +7,10 @@ import { auth } from './lib/auth';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { AppLoggerModule } from './app-logger/app-logger.module';
+import { PrismaService } from './prisma/prisma.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { ConfigModule } from '@nestjs/config';
+import { validate } from './lib/env';
 
 @Module({
   imports: [
@@ -23,9 +27,14 @@ import { AppLoggerModule } from './app-logger/app-logger.module';
         },
       },
     }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate,
+    }),
     AppLoggerModule,
+    PrismaModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, PrismaService],
 })
 export class AppModule {}
