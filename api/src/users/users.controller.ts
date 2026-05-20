@@ -13,6 +13,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RoleGuard } from 'src/role/role.guard';
 import { Role } from 'src/role/role.decorator';
+import { ApiCreatedResponse } from '@nestjs/swagger';
+import { CreateUserResponseDto } from './dto/create-user-response.dto';
 
 @Controller('users')
 @UseGuards(RoleGuard)
@@ -21,8 +23,12 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  @ApiCreatedResponse({
+    type: CreateUserResponseDto,
+    description: 'The user has been successfully created.',
+  })
+  async create(@Body() createUserDto: CreateUserDto) {
+    return await this.usersService.create(createUserDto);
   }
 
   @Get()

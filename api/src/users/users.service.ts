@@ -4,6 +4,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { auth } from 'src/lib/auth';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
+import { plainToInstance } from 'class-transformer';
+import { CreateUserResponseDto } from './dto/create-user-response.dto';
 
 @Injectable()
 export class UsersService {
@@ -21,8 +23,9 @@ export class UsersService {
           },
         },
       });
-
-      return user;
+      return plainToInstance(CreateUserResponseDto, user.user, {
+        excludeExtraneousValues: true,
+      });
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
