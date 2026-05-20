@@ -2,7 +2,7 @@ import { betterAuth } from 'better-auth';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { PrismaClient } from '../generated/prisma/client';
-import { openAPI } from 'better-auth/plugins';
+import { admin, openAPI } from 'better-auth/plugins';
 import { env } from '../config/env.config';
 // import { redis } from './redis';
 
@@ -14,11 +14,13 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+  emailAndPassword: {
+    enabled: true,
+  },
   user: {
     additionalFields: {
       role: {
         type: 'string',
-        input: false,
         defaultValue: 'USER',
       },
     },
@@ -71,5 +73,5 @@ export const auth = betterAuth({
     //   set: async (key, value) => redis.set(key, value),
     // },
   },
-  plugins: [openAPI()],
+  plugins: [admin(), openAPI()],
 });
