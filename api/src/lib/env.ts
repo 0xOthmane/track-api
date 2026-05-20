@@ -8,6 +8,8 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
   DATABASE_URL: z.url(),
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().int().positive().default(6379),
   LOG_LEVEL: z.string().default('info'),
 });
 
