@@ -7,7 +7,6 @@ import { auth } from './lib/auth';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { AppLoggerModule } from './app-logger/app-logger.module';
-import { PrismaService } from './prisma/prisma.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { validate } from './lib/env';
@@ -51,7 +50,6 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
   controllers: [AppController],
   providers: [
     AppService,
-    PrismaService,
     {
       provide: 'APP_GUARD',
       useClass: ThrottlerGuard,
