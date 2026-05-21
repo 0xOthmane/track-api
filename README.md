@@ -70,3 +70,9 @@ erDiagram
     AttendanceSession ||--o{ AttendanceRecord : contains
     User ||--o{ AttendanceRecord : attends
 ```
+
+### Create an admin user
+
+``` bash
+npm run create:admin -- admin@example.com supersecret "Admin Name"
+```

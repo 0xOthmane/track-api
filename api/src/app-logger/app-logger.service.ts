@@ -11,14 +11,14 @@ export class AppLoggerService {
 
   info(message: string, data?: Record<string, unknown>) {
     this.logger.info({
-      correlationId: this.cls.get('correlationId'),
       ...data,
+      correlationId: this.cls.get<string>('correlationId'),
       message,
     });
   }
   error(message: string, error?: unknown) {
     this.logger.error({
-      correlationId: this.cls.get('correlationId'),
+      correlationId: this.cls.get<string>('correlationId'),
       message,
       error,
     });

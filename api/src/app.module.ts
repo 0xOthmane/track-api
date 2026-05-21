@@ -7,10 +7,13 @@ import { auth } from './lib/auth';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { AppLoggerModule } from './app-logger/app-logger.module';
-import { PrismaService } from './prisma/prisma.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { validate } from './lib/env';
+import { UsersModule } from './users/users.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { redis } from './lib/redis';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 
 @Module({
   imports: [
@@ -33,8 +36,24 @@ import { validate } from './lib/env';
     }),
     AppLoggerModule,
     PrismaModule,
+    UsersModule,
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 10,
+        },
+      ],
+      storage: new ThrottlerStorageRedisService(redis),
+    }),
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [
+    AppService,
+    {
+      provide: 'APP_GUARD',
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

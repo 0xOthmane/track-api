@@ -11,6 +11,10 @@ try {
       PORT: process.env.PORT ? Number(process.env.PORT) : 3000,
       DATABASE_URL: process.env.DATABASE_URL ?? '',
       LOG_LEVEL: process.env.LOG_LEVEL ?? 'info',
+      REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
+      REDIS_PORT: process.env.REDIS_PORT
+        ? Number(process.env.REDIS_PORT)
+        : 6379,
     };
   } else {
     throw err;
