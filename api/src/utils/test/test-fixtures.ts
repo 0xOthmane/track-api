@@ -1,7 +1,7 @@
 import { TestingModule } from '@nestjs/testing';
 // import { type UserSession } from '@thallesp/nestjs-better-auth';
 
-// import { UsersService } from 'src/users/users.service';
+// import { UsersService } from '../users/users.service';
 
 export function buildFixtures(module: TestingModule) {
   //   const usersService = module.get(UsersService);

@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { auth } from 'src/lib/auth';
+import { auth } from '../lib/auth';
 import { ROLES_KEY } from './role.decorator';
 
 interface RoleRequest extends Request {

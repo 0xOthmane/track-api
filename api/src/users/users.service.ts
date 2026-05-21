@@ -5,8 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { plainToInstance } from 'class-transformer';
-import { CursorPaginationQuery } from 'src/cursor/cursor.pipe';
-import { auth } from 'src/lib/auth';
+import { CursorPaginationQuery } from '../cursor/cursor.pipe';
+import { auth } from '../lib/auth';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserResponseDto } from './dto/create-user-response.dto';
 import { CreateUserDto } from './dto/create-user.dto';

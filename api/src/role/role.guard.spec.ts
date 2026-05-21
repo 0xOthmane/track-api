@@ -4,12 +4,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { auth } from 'src/lib/auth';
-import { Role, Session, User } from 'src/generated/prisma/client';
+import { auth } from '../lib/auth';
+import { Role, Session, User } from '../generated/prisma/client';
 import { RoleGuard } from './role.guard';
 import { ROLES_KEY } from './role.decorator';
 
-jest.mock('src/lib/auth', () => ({
+jest.mock('../lib/auth', () => ({
   auth: {
     api: {
       getSession: jest.fn(),
