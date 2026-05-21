@@ -27,7 +27,7 @@ import {
   type CursorPaginationQuery,
   CursorPipe,
 } from '../common/pipes/cursor/cursor.pipe';
-import { CoursesListResponseDto } from './dto/course-response.dto';
+import { CourseResponseDto, CoursesListResponseDto } from './dto/course-response.dto';
 import { CapacityPipe } from './pipes/capacity.pipe';
 import { type User } from '../generated/prisma/client';
 
@@ -39,7 +39,7 @@ export class CoursesController {
   @Post()
   @Role('ADMIN', 'TEACHER')
   @ApiCreatedResponse({
-    type: CreateCourseDto,
+    type: CourseResponseDto,
     description: 'The course has been successfully created.',
   })
   async create(
@@ -63,7 +63,7 @@ export class CoursesController {
 
   @Get(':id')
   @ApiCreatedResponse({
-    type: CreateCourseDto,
+    type: CourseResponseDto,
     description: 'The course with the specified ID.',
   })
   async findOne(@Param('id') id: string) {
@@ -72,9 +72,11 @@ export class CoursesController {
 
   @Patch(':id')
   @ApiCreatedResponse({
-    type: CreateCourseDto,
+    type: CourseResponseDto,
     description: 'The course with the specified ID has been updated.',
   })
+  @Role('ADMIN', 'TEACHER')
+  @Owner({ model: 'course', field: 'teacherId', param: 'id' })
   async update(
     @Param('id') id: string,
     @Body() updateCourseDto: UpdateCourseDto,
@@ -84,9 +86,11 @@ export class CoursesController {
 
   @Delete(':id')
   @ApiCreatedResponse({
-    type: CreateCourseDto,
+    type: CourseResponseDto,
     description: 'The course with the specified ID has been deleted.',
   })
+  @Role('ADMIN', 'TEACHER')
+  @Owner({ model: 'course', field: 'teacherId', param: 'id' })
   async remove(@Param('id') id: string) {
     return await this.coursesService.remove(id);
   }

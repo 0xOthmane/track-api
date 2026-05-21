@@ -13,10 +13,10 @@ import { UpdateCourseDto } from './dto/update-course.dto';
 import { UpdateEvaluationWeightDto } from './dto/update-evaluation-weight.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '../generated/prisma/client';
-import { PrismaClientKnownRequestError } from '../generated/prisma/internal/prismaNamespace';
 import { plainToInstance } from 'class-transformer';
 import { CourseResponseDto } from './dto/course-response.dto';
 import { CursorPaginationQuery } from '../common/pipes/cursor/cursor.pipe';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 
 @Injectable()
 export class CoursesService {
@@ -133,6 +133,9 @@ export class CoursesService {
     try {
       const course = await this.prisma.course.delete({
         where: { id },
+        include: {
+          teacher: true,
+        },
       });
       return plainToInstance(CourseResponseDto, course, {
         excludeExtraneousValues: true,
