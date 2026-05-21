@@ -34,8 +34,10 @@ export class UserResponseDto {
 
 export class UsersListResponseDto {
   @ApiProperty({ type: () => [UserResponseDto] })
+  @Expose()
   readonly data!: UserResponseDto[];
 
   @ApiProperty({ type: () => PaginationMetaDto })
+  @Expose()
   readonly meta!: PaginationMetaDto;
 }

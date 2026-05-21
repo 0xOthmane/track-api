@@ -17,15 +17,19 @@ import { EnrollmentResponseDto } from './dto/enrollment-response.dto';
 import { EvaluationWeightResponseDto } from './dto/evaluation-weight-response.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { UpdateEvaluationWeightDto } from './dto/update-evaluation-weight.dto';
-import { RoleGuard } from '../role/role.guard';
-import { OwnerGuard } from '../owner/owner.guard';
-import { Role } from '../role/role.decorator';
-import { Owner } from '../owner/owner.decorator';
-import { CurrentUser } from '../current-user/current-user.decorator';
+import { RoleGuard } from '../common/decorators/role/role.guard';
+import { OwnerGuard } from '../common/decorators/owner/owner.guard';
+import { Role } from '../common/decorators/role/role.decorator';
+import { Owner } from '../common/decorators/owner/owner.decorator';
+import { CurrentUser } from '../common/decorators/current-user/current-user.decorator';
 import { ApiCreatedResponse } from '@nestjs/swagger';
-import { type CursorPaginationQuery, CursorPipe } from '../cursor/cursor.pipe';
+import {
+  type CursorPaginationQuery,
+  CursorPipe,
+} from '../common/pipes/cursor/cursor.pipe';
 import { CoursesListResponseDto } from './dto/course-response.dto';
 import { CapacityPipe } from './pipes/capacity.pipe';
+import { type User } from '../generated/prisma/client';
 
 @UseGuards(RoleGuard, OwnerGuard)
 @Controller('courses')
@@ -38,7 +42,13 @@ export class CoursesController {
     type: CreateCourseDto,
     description: 'The course has been successfully created.',
   })
-  async create(@Body() createCourseDto: CreateCourseDto, @CurrentUser() user) {
+  async create(
+    @Body() createCourseDto: CreateCourseDto,
+    @CurrentUser() user: User,
+  ) {
+    if (!createCourseDto.teacherId) {
+      createCourseDto.teacherId = user.id;
+    }
     return await this.coursesService.create(createCourseDto, user);
   }
 

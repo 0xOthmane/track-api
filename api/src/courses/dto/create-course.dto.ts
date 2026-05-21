@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -38,5 +39,6 @@ export class CreateCourseDto {
   @ApiProperty({ example: 'clp7x1f0a0000xv7t7v9a9c6b' })
   @IsString()
   @IsNotEmpty({ message: 'Teacher ID is required' })
-  readonly teacherId!: string;
+  @IsOptional()
+  teacherId!: string;
 }
