@@ -39,7 +39,9 @@ export class CoursesService {
         throw new NotFoundException('Teacher not found');
       }
 
-      if (teacher.role !== 'TEACHER' || user.role !== 'ADMIN') {
+      const allowedRoles = ['TEACHER', 'ADMIN'];
+
+      if (!allowedRoles.includes(user.role)) {
         throw new UnauthorizedException(
           'User is not authorized to create course',
         );
@@ -51,7 +53,7 @@ export class CoursesService {
           description: createCourseDto.description,
           capacity: createCourseDto.capacity,
           semester: createCourseDto.semester,
-          teacherId: createCourseDto.teacherId,
+          teacher: { connect: { id: createCourseDto.teacherId } },
         },
         include: {
           teacher: true,
@@ -178,7 +180,10 @@ export class CoursesService {
         }
 
         return await tx.enrollment.create({
-          data: { courseId, studentId },
+          data: {
+            course: { connect: { id: courseId } },
+            student: { connect: { id: studentId } },
+          },
           include: {
             course: { select: { name: true, description: true } },
             student: { select: { name: true } },
@@ -223,7 +228,11 @@ export class CoursesService {
 
     try {
       const weight = await this.prisma.evaluationWeight.create({
-        data: { courseId, type: dto.type, weight: dto.weight },
+        data: {
+          course: { connect: { id: courseId } },
+          type: dto.type,
+          weight: dto.weight,
+        },
       });
 
       return plainToInstance(EvaluationWeightResponseDto, weight, {
@@ -268,7 +277,11 @@ export class CoursesService {
     try {
       const weight = await this.prisma.evaluationWeight.update({
         where: { id: weightId },
-        data: dto,
+        data: {
+          course: { connect: { id: courseId } },
+          type: dto.type,
+          weight: dto.weight,
+        },
       });
 
       return plainToInstance(EvaluationWeightResponseDto, weight, {

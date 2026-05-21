@@ -7,14 +7,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core/services/reflector.service';
-import { Request } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UserRequest } from '../../../types';
 import { OwnerOptions } from './owner.decorator';
+import { Request } from 'express';
 
 type OwnedResource = {
   [key: string]: unknown;
 };
+type ResourceSource = Record<string, string | string[] | undefined>;
 
 @Injectable()
 export class OwnerGuard implements CanActivate {
@@ -31,12 +32,21 @@ export class OwnerGuard implements CanActivate {
     if (!options) {
       return true;
     }
-    const { model, field, param } = options;
-    const user = context.switchToHttp().getRequest<UserRequest>().user;
-    const resourceId = context.switchToHttp().getRequest<Request>().params[
-      param || 'id'
-    ];
-    if (Array.isArray(resourceId)) {
+    const { model, field, param, source } = options;
+    const request = context.switchToHttp().getRequest<Request & UserRequest>();
+    const user = request.user;
+    const resourceKey = param || 'id';
+    const sourceKey = source ?? 'params';
+    const resourceSource: ResourceSource =
+      sourceKey === 'body'
+        ? (request.body as ResourceSource)
+        : sourceKey === 'query'
+          ? (request.query as ResourceSource)
+          : request.params;
+    const resourceId = resourceSource?.[resourceKey];
+    if (!resourceId || Array.isArray(resourceId)) {
+      console.error('Invalid resource :', resourceSource);
+      console.error('Invalid resource ID:', resourceId);
       throw new BadRequestException('Invalid resource id');
     }
     let ressource: OwnedResource | null;

@@ -28,7 +28,8 @@
 				"prisma.prisma",
 				"esbenp.prettier-vscode",
 				"mermaidchart.vscode-mermaid-chart",
-				"humao.rest-client"
+				"humao.rest-client",
+				"mechatroner.rainbow-csv"
 			]
 		}
 	}

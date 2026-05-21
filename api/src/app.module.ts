@@ -12,9 +12,12 @@ import { ConfigModule } from '@nestjs/config';
 import { validate } from './lib/env';
 import { UsersModule } from './users/users.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
 import { redis } from './lib/redis';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { CoursesModule } from './courses/courses.module';
+import { GradesModule } from './grades/grades.module';
+import { env } from './config/env.config';
 
 @Module({
   imports: [
@@ -47,7 +50,14 @@ import { CoursesModule } from './courses/courses.module';
       ],
       storage: new ThrottlerStorageRedisService(redis),
     }),
+    BullModule.forRoot({
+      connection: {
+        host: env.REDIS_HOST,
+        port: env.REDIS_PORT,
+      },
+    }),
     CoursesModule,
+    GradesModule,
   ],
   controllers: [AppController],
   providers: [

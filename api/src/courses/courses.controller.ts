@@ -29,6 +29,7 @@ import {
 } from '../common/pipes/cursor/cursor.pipe';
 import { CoursesListResponseDto } from './dto/course-response.dto';
 import { CapacityPipe } from './pipes/capacity.pipe';
+import { type User } from '../generated/prisma/client';
 
 @UseGuards(RoleGuard, OwnerGuard)
 @Controller('courses')
@@ -41,7 +42,13 @@ export class CoursesController {
     type: CreateCourseDto,
     description: 'The course has been successfully created.',
   })
-  async create(@Body() createCourseDto: CreateCourseDto, @CurrentUser() user) {
+  async create(
+    @Body() createCourseDto: CreateCourseDto,
+    @CurrentUser() user: User,
+  ) {
+    if (!createCourseDto.teacherId) {
+      createCourseDto.teacherId = user.id;
+    }
     return await this.coursesService.create(createCourseDto, user);
   }
 
