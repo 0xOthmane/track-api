@@ -1,32 +1,41 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
+import { PaginationMetaDto } from '../../common/dtos/pagination-meta.dto';
 
 export class UserResponseDto {
   @ApiProperty({ example: 'clp7x1f0a0000xv7t7v9a9c6b' })
   @Expose()
-  id!: string;
+  readonly id!: string;
 
   @ApiProperty({ example: 'Jane Doe' })
   @Expose()
-  name!: string;
+  readonly name!: string;
 
   @ApiProperty({ example: 'jane.doe@example.com', format: 'email' })
   @Expose()
-  email!: string;
+  readonly email!: string;
 
   @ApiProperty({ example: 'USER' })
   @Expose()
-  role!: string;
+  readonly role!: string;
 
   @ApiProperty({ example: false })
   @Expose()
-  banned!: boolean;
+  readonly banned!: boolean;
 
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', format: 'date-time' })
   @Expose()
-  createdAt!: Date;
+  readonly createdAt!: Date;
 
   @ApiProperty({ example: '2024-01-02T00:00:00.000Z', format: 'date-time' })
   @Expose()
-  updatedAt!: Date;
+  readonly updatedAt!: Date;
+}
+
+export class UsersListResponseDto {
+  @ApiProperty({ type: () => [UserResponseDto] })
+  readonly data!: UserResponseDto[];
+
+  @ApiProperty({ type: () => PaginationMetaDto })
+  readonly meta!: PaginationMetaDto;
 }

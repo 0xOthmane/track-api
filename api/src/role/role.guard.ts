@@ -8,21 +8,14 @@ import {
 import { Reflector } from '@nestjs/core';
 import { auth } from '../lib/auth';
 import { ROLES_KEY } from './role.decorator';
-
-interface RoleRequest extends Request {
-  user: {
-    role?: string;
-    [key: string]: any;
-  };
-  session?: Record<string, unknown>;
-}
+import { UserRequest } from '../types';
 
 @Injectable()
 export class RoleGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<RoleRequest>();
+    const request = context.switchToHttp().getRequest<UserRequest>();
     const session = await auth.api.getSession({
       headers: request.headers,
     });
