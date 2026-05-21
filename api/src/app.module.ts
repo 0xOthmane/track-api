@@ -14,6 +14,7 @@ import { UsersModule } from './users/users.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { redis } from './lib/redis';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { CoursesModule } from './courses/courses.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
       ],
       storage: new ThrottlerStorageRedisService(redis),
     }),
+    CoursesModule,
   ],
   controllers: [AppController],
   providers: [

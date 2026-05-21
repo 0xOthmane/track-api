@@ -8,8 +8,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core/services/reflector.service';
 import { Request } from 'express';
-import { User } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRequest } from '../types';
 import { OwnerOptions } from './owner.decorator';
 
 type OwnedResource = {
@@ -32,9 +32,7 @@ export class OwnerGuard implements CanActivate {
       return true;
     }
     const { model, field, param } = options;
-    const user = context
-      .switchToHttp()
-      .getRequest<Request & { user: User }>().user;
+    const user = context.switchToHttp().getRequest<UserRequest>().user;
     const resourceId = context.switchToHttp().getRequest<Request>().params[
       param || 'id'
     ];

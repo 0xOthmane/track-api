@@ -5,6 +5,7 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -43,16 +44,19 @@ export class CreateUserDto {
 
   @ApiProperty({ example: 'https://example.com/avatar.jpg', format: 'uri' })
   @IsString()
+  @IsOptional()
   readonly image?: string;
 
   @ApiProperty({ example: false })
   @IsBoolean()
+  @IsOptional()
   readonly banned?: boolean;
 
   @ApiProperty({ example: 'Violation of terms of service' })
   @IsString()
+  @IsOptional()
   @MaxLength(255, {
     message: 'Banned reason must be at most 255 characters long',
   })
-  readonly bannedReason?: string;
+  readonly banReason?: string;
 }

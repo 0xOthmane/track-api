@@ -75,14 +75,7 @@ export class UsersService {
     try {
       const user = await this.prisma.user.update({
         where: { id },
-        data: {
-          name: updateUserDto.name,
-          email: updateUserDto.email,
-          role: updateUserDto.role,
-          image: updateUserDto.image,
-          banned: updateUserDto.banned,
-          bannedReason: updateUserDto.bannedReason,
-        },
+        data: updateUserDto,
       });
       return plainToInstance(UserResponseDto, user, {
         excludeExtraneousValues: true,
