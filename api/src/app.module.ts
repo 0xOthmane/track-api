@@ -18,6 +18,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import { CoursesModule } from './courses/courses.module';
 import { GradesModule } from './grades/grades.module';
 import { env } from './config/env.config';
+import { AttendancesModule } from './attendances/attendances.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { env } from './config/env.config';
     }),
     CoursesModule,
     GradesModule,
+    AttendancesModule,
   ],
   controllers: [AppController],
   providers: [
