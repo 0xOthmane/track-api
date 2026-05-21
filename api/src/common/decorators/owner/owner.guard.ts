@@ -8,8 +8,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core/services/reflector.service';
 import { Request } from 'express';
-import { PrismaService } from '../prisma/prisma.service';
-import { UserRequest } from '../types';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { UserRequest } from '../../../types';
 import { OwnerOptions } from './owner.decorator';
 
 type OwnedResource = {

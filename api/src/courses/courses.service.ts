@@ -16,7 +16,7 @@ import { User } from '../generated/prisma/client';
 import { PrismaClientKnownRequestError } from '../generated/prisma/internal/prismaNamespace';
 import { plainToInstance } from 'class-transformer';
 import { CourseResponseDto } from './dto/course-response.dto';
-import { CursorPaginationQuery } from '../cursor/cursor.pipe';
+import { CursorPaginationQuery } from '../common/pipes/cursor/cursor.pipe';
 
 @Injectable()
 export class CoursesService {

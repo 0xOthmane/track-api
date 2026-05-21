@@ -12,14 +12,17 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { RoleGuard } from '../role/role.guard';
-import { Role } from '../role/role.decorator';
+import { RoleGuard } from '../common/decorators/role/role.guard';
+import { Role } from '../common/decorators/role/role.decorator';
 import { ApiCreatedResponse } from '@nestjs/swagger';
 import {
   UserResponseDto,
   UsersListResponseDto,
 } from './dto/create-user-response.dto';
-import { type CursorPaginationQuery, CursorPipe } from '../cursor/cursor.pipe';
+import {
+  type CursorPaginationQuery,
+  CursorPipe,
+} from '../common/pipes/cursor/cursor.pipe';
 
 @Controller('users')
 @UseGuards(RoleGuard)
