@@ -41,8 +41,8 @@ export class UsersController {
     type: UsersListResponseDto,
     description: 'List of users with pagination.',
   })
-  findAll(@Query(CursorPipe) params: CursorPaginationQuery) {
-    return this.usersService.findAll(params);
+  async findAll(@Query(CursorPipe) params: CursorPaginationQuery) {
+    return await this.usersService.findAll(params);
   }
 
   @Get(':id')
@@ -50,8 +50,8 @@ export class UsersController {
     type: UserResponseDto,
     description: 'The user with the specified ID.',
   })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    return await this.usersService.findOne(id);
   }
 
   @Patch(':id')
@@ -59,8 +59,8 @@ export class UsersController {
     type: UserResponseDto,
     description: 'The user has been successfully updated.',
   })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return await this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
@@ -68,7 +68,7 @@ export class UsersController {
     type: UserResponseDto,
     description: 'The user has been successfully deleted.',
   })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  async remove(@Param('id') id: string) {
+    return await this.usersService.remove(id);
   }
 }

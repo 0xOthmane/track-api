@@ -14,4 +14,4 @@ export type OwnerOptions = {
   field?: string;
   param?: string;
 };
-export const Owner = (...args: string[]) => SetMetadata(OWNER_KEY, args);
+export const Owner = (options: OwnerOptions) => SetMetadata(OWNER_KEY, options);
