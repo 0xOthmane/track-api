@@ -1,11 +1,16 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from '../prisma/prisma.service';
-import { auth } from 'src/lib/auth';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { plainToInstance } from 'class-transformer';
-import { CreateUserResponseDto } from './dto/create-user-response.dto';
+import { CursorPaginationQuery } from 'src/cursor/cursor.pipe';
+import { auth } from 'src/lib/auth';
+import { PrismaService } from '../prisma/prisma.service';
+import { UserResponseDto } from './dto/create-user-response.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -23,7 +28,7 @@ export class UsersService {
           },
         },
       });
-      return plainToInstance(CreateUserResponseDto, user.user, {
+      return plainToInstance(UserResponseDto, user.user, {
         excludeExtraneousValues: true,
       });
     } catch (error) {
@@ -37,19 +42,79 @@ export class UsersService {
     }
   }
 
-  findAll() {
-    return `This action returns all users`;
+  async findAll(params: CursorPaginationQuery) {
+    const { cursor, limit } = params;
+    const users = await this.prisma.user.findMany({
+      take: limit,
+      cursor: cursor ? { id: cursor } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
+    const nextCursor =
+      users.length === limit ? users[users.length - 1].id : null;
+    return {
+      data: plainToInstance(UserResponseDto, users, {
+        excludeExtraneousValues: true,
+      }),
+      meta: { nextCursor },
+    };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    try {
+      const user = await this.prisma.user.update({
+        where: { id },
+        data: {
+          name: updateUserDto.name,
+          email: updateUserDto.email,
+          role: updateUserDto.role,
+          image: updateUserDto.image,
+          banned: updateUserDto.banned,
+          bannedReason: updateUserDto.bannedReason,
+        },
+      });
+      return plainToInstance(UserResponseDto, user, {
+        excludeExtraneousValues: true,
+      });
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException('User not found');
+        }
+        if (error.code === 'P2002') {
+          throw new ConflictException('A user with this email already exists');
+        }
+      }
+      throw error;
+    }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async remove(id: string) {
+    try {
+      const user = await this.prisma.user.delete({
+        where: { id },
+      });
+      return plainToInstance(UserResponseDto, user, {
+        excludeExtraneousValues: true,
+      });
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException('User not found');
+        }
+      }
+      throw error;
+    }
   }
 }

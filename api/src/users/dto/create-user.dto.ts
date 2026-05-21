@@ -1,6 +1,7 @@
 import { Transform, type TransformFnParams } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -39,4 +40,19 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   @IsNotEmpty()
   readonly role!: UserRole;
+
+  @ApiProperty({ example: 'https://example.com/avatar.jpg', format: 'uri' })
+  @IsString()
+  readonly image?: string;
+
+  @ApiProperty({ example: false })
+  @IsBoolean()
+  readonly banned?: boolean;
+
+  @ApiProperty({ example: 'Violation of terms of service' })
+  @IsString()
+  @MaxLength(255, {
+    message: 'Banned reason must be at most 255 characters long',
+  })
+  readonly bannedReason?: string;
 }
