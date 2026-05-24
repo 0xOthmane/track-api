@@ -242,7 +242,7 @@ describe('AdminService', () => {
         { courseId: 'course-1', courseName: 'Math 101', average: 14 },
       ],
       globalAtRiskCount: 1,
-    } as never);
+    });
 
     await expect(service.sendSemesterSummary('Fall 2024')).resolves.toEqual({
       semester: 'Fall 2024',

@@ -12,6 +12,12 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
+  const httpServer = app.getHttpAdapter().getInstance() as {
+    set: (setting: string, value: unknown) => void;
+  };
+
+  httpServer.set('trust proxy', 1);
+
   app.use(json());
   app.use(text({ type: ['text/csv', 'text/plain'] }));
 

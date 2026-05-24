@@ -27,7 +27,10 @@ import {
   type CursorPaginationQuery,
   CursorPipe,
 } from '../common/pipes/cursor/cursor.pipe';
-import { CourseResponseDto, CoursesListResponseDto } from './dto/course-response.dto';
+import {
+  CourseResponseDto,
+  CoursesListResponseDto,
+} from './dto/course-response.dto';
 import { CapacityPipe } from './pipes/capacity.pipe';
 import { type User } from '../generated/prisma/client';
 
