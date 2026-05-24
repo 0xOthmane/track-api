@@ -24,6 +24,12 @@ type AdminStatsPayload = {
   globalAtRiskCount: number;
 };
 
+/**
+ * AdminService
+ *
+ * Provides admin-facing utilities such as importing enrollments from CSV,
+ * generating semester reports, and caching admin statistics.
+ */
 @Injectable()
 export class AdminService {
   constructor(
@@ -31,6 +37,12 @@ export class AdminService {
     private readonly logger: AppLoggerService,
   ) {}
 
+  /**
+   * Generate a CSV string containing the semester report for all students
+   * and courses in the provided semester.
+   * @param semester - Semester identifier (e.g. "2026-Spring")
+   * @returns CSV string (includes header row)
+   */
   async getSemesterReportCsv(semester: string) {
     const rows = await this.getSemesterReportRows(semester);
     const lines = [
@@ -58,6 +70,11 @@ export class AdminService {
     return `${lines.join('\n')}\n`;
   }
 
+  /**
+   * Import enrollments from a CSV payload. Returns a DTO describing how many
+   * rows were enrolled and which rows were skipped with reasons.
+   * @param csv - CSV content (with headers `studentId` and `courseId`)
+   */
   async importEnrollments(csv: string) {
     if (!csv?.trim()) {
       throw new BadRequestException('CSV content is required');
@@ -156,6 +173,10 @@ export class AdminService {
     );
   }
 
+  /**
+   * Compute or retrieve cached admin statistics for a semester.
+   * @param semester - Semester identifier
+   */
   async getStats(semester: string) {
     if (!semester?.trim()) {
       throw new BadRequestException('Semester is required');
@@ -176,6 +197,11 @@ export class AdminService {
     });
   }
 
+  /**
+   * Simulate sending a semester summary (logs the summary and returns a DTO
+   * indicating the simulated delivery status).
+   * @param semester - Semester identifier
+   */
   async sendSemesterSummary(semester: string) {
     const stats = await this.getStats(semester);
 

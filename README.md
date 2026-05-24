@@ -73,6 +73,11 @@ erDiagram
 
 ### Create an admin user
 
-``` bash
+```bash
 npm run create:admin -- admin@example.com supersecret "Admin Name"
 ```
+
+### Quickstart
+
+- **API docs (Swagger):** visit `http://localhost:3000/api/docs` after starting the server.
+- **Repository API:** See `api/README.md` for full setup and runtime instructions.

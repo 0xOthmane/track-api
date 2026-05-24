@@ -36,6 +36,18 @@ export class GradesService {
     @InjectQueue(GRADES_IMPORT_QUEUE)
     private importQueue: Queue<ImportGradesJobData, ImportGradesResult>,
   ) {}
+  /**
+   * GradesService
+   *
+   * Responsible for creating, updating and querying grades. Supports
+   * cursor-based pagination, importing grades via background jobs, and
+   * computing course averages.
+   */
+  /**
+   * Create a grade for a student in a course.
+   * @param createGradeDto - payload with student, course, evaluation type and value
+   * @param user - the creating user (used to set `createdBy`)
+   */
   async create(createGradeDto: CreateGradeDto, user: User) {
     try {
       const grade = await this.prisma.grade.create({
@@ -74,6 +86,9 @@ export class GradesService {
     }
   }
 
+  /**
+   * Find grades with cursor pagination. Teachers only see grades they created.
+   */
   async findAll(params: CursorPaginationQuery, user: User) {
     const { cursor, limit } = params;
     const where =
@@ -98,6 +113,9 @@ export class GradesService {
     };
   }
 
+  /**
+   * Find a single grade by id.
+   */
   async findOne(id: string) {
     const grade = await this.prisma.grade.findUnique({
       where: { id },
@@ -114,6 +132,9 @@ export class GradesService {
     });
   }
 
+  /**
+   * Update an existing grade.
+   */
   async update(id: string, updateGradeDto: UpdateGradeDto) {
     try {
       const grade = await this.prisma.grade.update({
@@ -138,6 +159,9 @@ export class GradesService {
     }
   }
 
+  /**
+   * Remove a grade by id.
+   */
   async remove(id: string) {
     try {
       const grade = await this.prisma.grade.delete({
@@ -161,6 +185,9 @@ export class GradesService {
     }
   }
 
+  /**
+   * Find grades for the authenticated student (cursor pagination).
+   */
   async findMine(params: CursorPaginationQuery, user: User) {
     const { cursor, limit } = params;
     const grades = await this.prisma.grade.findMany({
@@ -183,6 +210,9 @@ export class GradesService {
     };
   }
 
+  /**
+   * Find grades for a given course (cursor pagination).
+   */
   async findByCourse(courseId: string, params: CursorPaginationQuery) {
     const { cursor, limit } = params;
     const grades = await this.prisma.grade.findMany({
@@ -205,6 +235,9 @@ export class GradesService {
     };
   }
 
+  /**
+   * Compute averages for a course grouped by evaluation type and overall.
+   */
   async getCourseAverages(courseId: string) {
     const byType = await this.prisma.grade.groupBy({
       by: ['evaluationType'],
@@ -235,6 +268,9 @@ export class GradesService {
     );
   }
 
+  /**
+   * Enqueue a CSV import job for grades. Returns a job id and status URL.
+   */
   async enqueueImport(
     body: ImportGradesDto,
     file: Express.Multer.File,
@@ -271,6 +307,9 @@ export class GradesService {
     );
   }
 
+  /**
+   * Get status for an import job, enforcing access control for non-admins.
+   */
   async getImportStatus(jobId: string, user: User) {
     const job = await this.importQueue.getJob(jobId);
     if (!job) {

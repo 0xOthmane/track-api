@@ -22,6 +22,17 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * CoursesService
+   *
+   * Handles course lifecycle: create, update, delete, enrollment and
+   * management of evaluation weights. Enforces simple role-based checks
+   * for teachers and admins.
+   */
+
+  /**
+   * Create a new course. Teachers may only create courses for themselves.
+   */
   async create(createCourseDto: CreateCourseDto, user: User) {
     try {
       if (user.role === 'TEACHER' && user.id !== createCourseDto.teacherId) {
@@ -72,6 +83,9 @@ export class CoursesService {
     }
   }
 
+  /**
+   * List courses with cursor pagination.
+   */
   async findAll(params: CursorPaginationQuery) {
     const { cursor, limit } = params;
     const courses = await this.prisma.course.findMany({
@@ -92,6 +106,9 @@ export class CoursesService {
     };
   }
 
+  /**
+   * Get a single course by id.
+   */
   async findOne(id: string) {
     const course = await this.prisma.course.findUnique({
       where: { id },
@@ -107,6 +124,9 @@ export class CoursesService {
     });
   }
 
+  /**
+   * Update course metadata.
+   */
   async update(id: string, updateCourseDto: UpdateCourseDto) {
     try {
       const course = await this.prisma.course.update({
@@ -129,6 +149,9 @@ export class CoursesService {
     }
   }
 
+  /**
+   * Delete a course.
+   */
   async remove(id: string) {
     try {
       const course = await this.prisma.course.delete({
@@ -150,6 +173,9 @@ export class CoursesService {
     }
   }
 
+  /**
+   * Enroll a student into a course, enforcing capacity and role checks.
+   */
   async enroll(courseId: string, studentId: string) {
     try {
       const enrollment = await this.prisma.$transaction(async (tx) => {
@@ -221,6 +247,9 @@ export class CoursesService {
     }
   }
 
+  /**
+   * Add an evaluation weight for a course. Ensures total weights <= 100.
+   */
   async addWeight(courseId: string, dto: CreateEvaluationWeightDto) {
     await this.ensureCourseExists(courseId);
 
@@ -256,6 +285,9 @@ export class CoursesService {
     }
   }
 
+  /**
+   * Update a specific evaluation weight for a course.
+   */
   async updateWeight(
     courseId: string,
     weightId: string,
@@ -301,6 +333,9 @@ export class CoursesService {
     }
   }
 
+  /**
+   * Remove an evaluation weight from a course.
+   */
   async deleteWeight(courseId: string, weightId: string) {
     const existing = await this.prisma.evaluationWeight.findFirst({
       where: { id: weightId, courseId },

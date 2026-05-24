@@ -31,6 +31,17 @@ export class AttendancesService {
     private prisma: PrismaService,
     private attendanceGateway: AttendanceGateway,
   ) {}
+  /**
+   * AttendancesService
+   *
+   * Manages attendance sessions and records for courses. Notifies teachers
+   * when students become at-risk based on absence thresholds.
+   */
+  /**
+   * Create an attendance session for a course.
+   * @param courseId - Course identifier
+   * @param createAttendanceSessionDto - DTO containing the session date and metadata
+   */
   async createSession(
     courseId: string,
     createAttendanceSessionDto: CreateAttendanceSessionDto,
@@ -68,6 +79,13 @@ export class AttendancesService {
     }
   }
 
+  /**
+   * Create attendance records for a session. Validates uniqueness per student
+   * and emits notifications for students who become at-risk.
+   * @param courseId - Course identifier
+   * @param sessionId - Attendance session id
+   * @param createAttendanceDtos - Array of attendance records to create
+   */
   async createRecord(
     courseId: string,
     sessionId: string,
@@ -244,6 +262,10 @@ export class AttendancesService {
     return this.calculateAttendanceMetrics(resolvedTotalCount, presentCount);
   }
 
+  /**
+   * Return simple counts for a session: total, present and absent.
+   * @param sessionId - Attendance session id
+   */
   async getStats(sessionId: string) {
     const session = await this.prisma.attendanceSession.findUnique({
       where: {
@@ -270,6 +292,10 @@ export class AttendancesService {
     };
   }
 
+  /**
+   * Update a single attendance record. Ensures the requesting user owns
+   * the course (teacher) before allowing updates.
+   */
   async updateSessionRecord(
     id: string,
     updateAttendanceRecordDto: UpdateAttendanceRecordDto,
@@ -325,6 +351,9 @@ export class AttendancesService {
     }
   }
 
+  /**
+   * Fetch attendance records for a particular student in a course.
+   */
   async getStudentRecords(courseId: string, studentId: string) {
     try {
       const records = await this.prisma.attendanceRecord.findMany({
