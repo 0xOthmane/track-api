@@ -14,6 +14,7 @@ import {
   type AttendanceAtRiskNotification,
 } from './attendance.gateway';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
+import { clearCachedAdminStats } from '../admin/admin-stats-cache';
 
 type AttendanceMetrics = {
   totalCount: number;
@@ -41,6 +42,13 @@ export class AttendancesService {
           courseId,
         },
       });
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { semester: true },
+      });
+      if (course) {
+        await clearCachedAdminStats(course.semester);
+      }
       return attendance;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
@@ -86,6 +94,7 @@ export class AttendancesService {
             course: {
               select: {
                 teacherId: true,
+                semester: true,
               },
             },
           },
@@ -154,12 +163,15 @@ export class AttendancesService {
         return {
           records: createAttendanceDtos,
           notifications,
+          semester: session.course.semester,
         };
       });
 
       for (const notification of result.notifications) {
         this.attendanceGateway.emitAtRisk(notification);
       }
+
+      await clearCachedAdminStats(result.semester);
 
       return result;
     } catch (error) {
@@ -274,6 +286,7 @@ export class AttendancesService {
             course: {
               select: {
                 teacherId: true,
+                semester: true,
               },
             },
           },
@@ -297,6 +310,7 @@ export class AttendancesService {
           present: updateAttendanceRecordDto.present,
         },
       });
+      await clearCachedAdminStats(record.session.course.semester);
       return updatedRecord;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {

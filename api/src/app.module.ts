@@ -19,6 +19,7 @@ import { CoursesModule } from './courses/courses.module';
 import { GradesModule } from './grades/grades.module';
 import { env } from './config/env.config';
 import { AttendancesModule } from './attendances/attendances.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { AttendancesModule } from './attendances/attendances.module';
     CoursesModule,
     GradesModule,
     AttendancesModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

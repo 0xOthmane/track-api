@@ -26,6 +26,7 @@ import {
   type ImportGradesJobData,
   type ImportGradesResult,
 } from './grades-import.types';
+import { clearCachedAdminStats } from '../admin/admin-stats-cache';
 
 @Injectable()
 export class GradesService {
@@ -54,6 +55,7 @@ export class GradesService {
           student: { select: { name: true } },
         },
       });
+      await clearCachedAdminStats(grade.course.semester);
       return plainToInstance(GradeResponseDto, grade, {
         excludeExtraneousValues: true,
       });
@@ -118,10 +120,11 @@ export class GradesService {
         where: { id },
         data: updateGradeDto,
         include: {
-          course: { select: { name: true } },
+          course: { select: { name: true, semester: true } },
           student: { select: { name: true } },
         },
       });
+      await clearCachedAdminStats(grade.course.semester);
       return plainToInstance(GradeResponseDto, grade, {
         excludeExtraneousValues: true,
       });
@@ -140,10 +143,11 @@ export class GradesService {
       const grade = await this.prisma.grade.delete({
         where: { id },
         include: {
-          course: { select: { name: true } },
+          course: { select: { name: true, semester: true } },
           student: { select: { name: true } },
         },
       });
+      await clearCachedAdminStats(grade.course.semester);
       return plainToInstance(GradeResponseDto, grade, {
         excludeExtraneousValues: true,
       });

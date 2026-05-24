@@ -29,7 +29,7 @@ import { env } from '../config/env.config';
       },
     }),
   ],
-  exports: [LoggerModule],
+  exports: [LoggerModule, AppLoggerService],
   providers: [AppLoggerService],
 })
 export class AppLoggerModule {}

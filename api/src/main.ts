@@ -4,12 +4,16 @@ import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { env } from './config/env.config';
 import { ValidationPipe } from '@nestjs/common/pipes/validation.pipe';
+import { json, text } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
     bufferLogs: true,
   });
+
+  app.use(json());
+  app.use(text({ type: ['text/csv', 'text/plain'] }));
 
   app.useGlobalPipes(
     new ValidationPipe({
