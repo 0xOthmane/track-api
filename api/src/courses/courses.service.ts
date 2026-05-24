@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { CreateEvaluationWeightDto } from './dto/create-evaluation-weight.dto';
@@ -79,7 +81,8 @@ export class CoursesService {
           throw new NotFoundException('Teacher not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -145,7 +148,8 @@ export class CoursesService {
           throw new NotFoundException('Teacher not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -169,7 +173,8 @@ export class CoursesService {
           throw new NotFoundException('Course not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -243,7 +248,8 @@ export class CoursesService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -281,7 +287,8 @@ export class CoursesService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -329,7 +336,8 @@ export class CoursesService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 

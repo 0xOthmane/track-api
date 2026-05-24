@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -63,7 +65,7 @@ export class GradesService {
           createdBy: { connect: { id: user.id } },
         },
         include: {
-          course: { select: { name: true } },
+          course: { select: { name: true, semester: true } },
           student: { select: { name: true } },
         },
       });
@@ -82,7 +84,8 @@ export class GradesService {
           );
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -155,7 +158,8 @@ export class GradesService {
           throw new NotFoundException('Grade not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -181,7 +185,8 @@ export class GradesService {
           throw new NotFoundException('Grade not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 

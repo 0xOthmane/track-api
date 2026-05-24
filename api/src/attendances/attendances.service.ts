@@ -3,6 +3,8 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -75,7 +77,8 @@ export class AttendancesService {
         }
       }
       console.error('Error creating attendance session:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -206,7 +209,8 @@ export class AttendancesService {
         }
       }
       console.error('Error creating attendance record:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -347,7 +351,8 @@ export class AttendancesService {
         }
       }
       console.error('Error updating attendance record:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -379,7 +384,8 @@ export class AttendancesService {
         }
       }
       console.error('Error fetching student attendance records:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 }

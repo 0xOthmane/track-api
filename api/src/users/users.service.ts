@@ -2,6 +2,8 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { plainToInstance } from 'class-transformer';
@@ -48,7 +50,8 @@ export class UsersService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -108,7 +111,8 @@ export class UsersService {
           throw new ConflictException('A user with this email already exists');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -129,7 +133,8 @@ export class UsersService {
           throw new NotFoundException('User not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 }
