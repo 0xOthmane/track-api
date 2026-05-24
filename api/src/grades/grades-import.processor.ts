@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { parse } from 'csv-parse/sync';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EvaluationType } from '../generated/prisma/enums';
 import { GRADES_IMPORT_QUEUE } from './grades-import.constants';
@@ -48,49 +47,69 @@ export class GradesImportProcessor extends WorkerHost {
       `Starting grades import job ${job.id} for course ${courseId} (correlationId=${correlationId ?? 'n/a'})`,
     );
 
-    const parsedRows = this.parseCsv(csv, courseId);
-    const errors: ImportGradesResult['errors'] = [];
-    let successCount = 0;
+    const { rows: parsedRows, errors: parseErrors } = this.parseCsv(
+      csv,
+      courseId,
+    );
+    const errors: ImportGradesResult['errors'] = [...parseErrors];
+
+    const validatedRows: Array<
+      ParsedGradeRow & { rowNumber: number; studentId: string }
+    > = [];
 
     for (const row of parsedRows) {
-      try {
-        const student = await this.findStudent(row.studentIdentifier);
-        if (!student) {
-          throw new BadRequestException('Student not found');
-        }
-        if (student.role !== 'STUDENT') {
-          throw new BadRequestException('User is not a student');
-        }
+      const student = await this.findStudent(row);
+      if (!student) {
+        errors.push({ rowNumber: row.rowNumber, message: 'Student not found' });
+        continue;
+      }
 
-        await this.prisma.grade.create({
+      if (student.role !== 'STUDENT') {
+        errors.push({
+          rowNumber: row.rowNumber,
+          message: 'User is not a student',
+        });
+        continue;
+      }
+
+      validatedRows.push({ ...row, studentId: student.id });
+    }
+
+    if (errors.length > 0) {
+      await job.updateProgress(100);
+      for (const error of errors) {
+        this.logger.warn(
+          `Failed to import row ${error.rowNumber}: ${error.message} (correlationId=${correlationId ?? 'n/a'})`,
+        );
+      }
+
+      return {
+        successCount: 0,
+        failureCount: errors.length,
+        errors,
+      };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const row of validatedRows) {
+        await tx.grade.create({
           data: {
             value: row.value,
             evaluationType: row.evaluationType,
             course: { connect: { id: row.courseId } },
-            student: { connect: { id: student.id } },
+            student: { connect: { id: row.studentId } },
             createdBy: { connect: { id: userId } },
           },
         });
-
-        successCount += 1;
-      } catch (error) {
-        const message = this.getRowErrorMessage(error);
-        errors.push({ rowNumber: row.rowNumber, message });
-        this.logger.warn(
-          `Failed to import row ${row.rowNumber}: ${message} (correlationId=${correlationId ?? 'n/a'})`,
-        );
       }
+    });
 
-      const processed = successCount + errors.length;
-      await job.updateProgress(
-        Math.round((processed / parsedRows.length) * 100),
-      );
-    }
+    await job.updateProgress(100);
 
     return {
-      successCount,
-      failureCount: errors.length,
-      errors,
+      successCount: validatedRows.length,
+      failureCount: 0,
+      errors: [],
     };
   }
 
@@ -109,9 +128,21 @@ export class GradesImportProcessor extends WorkerHost {
     const headerMap = this.buildHeaderMap(firstRow);
     const rows = headerMap ? restRows : records;
 
-    return rows.map((row, index) =>
-      this.parseRow(row, headerMap, jobCourseId, index + 1),
-    );
+    const parsedRows: Array<ParsedGradeRow & { rowNumber: number }> = [];
+    const errors: ImportGradesResult['errors'] = [];
+
+    rows.forEach((row, index) => {
+      try {
+        parsedRows.push(this.parseRow(row, headerMap, jobCourseId, index + 1));
+      } catch (error) {
+        errors.push({
+          rowNumber: index + 1,
+          message: this.getRowErrorMessage(error),
+        });
+      }
+    });
+
+    return { rows: parsedRows, errors };
   }
 
   private buildHeaderMap(row: string[]): HeaderMap | null {
@@ -225,16 +256,16 @@ export class GradesImportProcessor extends WorkerHost {
     return row[fallbackIndex];
   }
 
-  private async findStudent(identifier: string) {
-    if (identifier.includes('@')) {
+  private async findStudent(row: ParsedGradeRow) {
+    if (row.studentIdentifierType === 'email') {
       return this.prisma.user.findUnique({
-        where: { email: identifier },
+        where: { email: row.studentIdentifier },
         select: { id: true, role: true },
       });
     }
 
     return this.prisma.user.findUnique({
-      where: { id: identifier },
+      where: { id: row.studentIdentifier },
       select: { id: true, role: true },
     });
   }
@@ -242,15 +273,6 @@ export class GradesImportProcessor extends WorkerHost {
   private getRowErrorMessage(error: unknown) {
     if (error instanceof BadRequestException) {
       return error.message;
-    }
-
-    if (error instanceof PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        return 'Grade already exists for this student and course';
-      }
-      if (error.code === 'P2003') {
-        return 'Course or student not found';
-      }
     }
 
     return 'Failed to import grade';
