@@ -1,10 +1,19 @@
-jest.mock('../lib/auth', () => ({
-  auth: {
-    api: {
-      getSession: jest.fn(),
-    },
-  },
-}));
+import { setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
+import { createTestAuth } from '../utils/test/auth-helper';
+
+let ctx: Awaited<ReturnType<typeof setupTestDb>> | null = null;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  await createTestAuth(ctx.prisma);
+  // require auth module after DB is ready so it initializes against test DB
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('../lib/auth');
+});
+
+afterAll(async () => {
+  if (ctx) await teardownTestDb(ctx);
+});
 
 jest.mock('./admin-stats-cache', () => ({
   getCachedAdminStats: jest.fn(),

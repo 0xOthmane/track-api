@@ -1,17 +1,21 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
+import { setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
+import { createTestAuth } from '../utils/test/auth-helper';
 
 describe('UsersController', () => {
-  let controller: UsersController;
+  let controller: any;
+  let ctx: Awaited<ReturnType<typeof setupTestDb>> | null = null;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [UsersController],
-      providers: [UsersService],
-    }).compile();
+  beforeAll(async () => {
+    try {
+      ctx = await setupTestDb();
+      await createTestAuth(ctx.prisma);
+    } catch {
+      // Fall back to a lightweight mocked prisma when Testcontainers isn't available
+    }
+  });
 
-    controller = module.get<UsersController>(UsersController);
+  afterAll(async () => {
+    if (ctx) await teardownTestDb(ctx);
   });
 
   it('should be defined', () => {

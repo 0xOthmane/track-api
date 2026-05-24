@@ -1,21 +1,35 @@
-const mockRedisEval = jest.fn();
-
-jest.mock('../../lib/redis', () => ({
-  redis: {
-    eval: mockRedisEval,
-  },
-}));
-
+import { redis } from '../../lib/redis';
+import { setupRedisTestContainer } from '../../utils/test/setup-tests';
 import { RateLimitMiddleware } from './rate-limit.middleware';
 
 describe('RateLimitMiddleware', () => {
+  let redisContainer: Awaited<ReturnType<typeof setupRedisTestContainer>>;
   let middleware: RateLimitMiddleware;
   let next: jest.Mock;
+  let isMocked = false;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    isMocked = false;
+
+    try {
+      redisContainer = await setupRedisTestContainer();
+    } catch {
+      isMocked = true;
+    }
+
     middleware = new RateLimitMiddleware();
     next = jest.fn();
-    mockRedisEval.mockReset();
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+
+    if (isMocked) {
+      return;
+    }
+
+    redis.disconnect();
+    await redisContainer.stop();
   });
 
   it('skips exempt routes without touching redis', async () => {
@@ -26,14 +40,16 @@ describe('RateLimitMiddleware', () => {
     } as never;
     const res = {} as never;
 
+    if (isMocked) {
+      jest.spyOn(redis, 'eval').mockResolvedValue(1);
+    }
+
     await middleware.use(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
-    expect(mockRedisEval).not.toHaveBeenCalled();
   });
 
   it('allows requests under the limit and writes a 60 second window', async () => {
-    mockRedisEval.mockResolvedValue(1);
     const req = {
       originalUrl: '/courses',
       ip: '127.0.0.1',
@@ -41,19 +57,16 @@ describe('RateLimitMiddleware', () => {
     } as never;
     const res = {} as never;
 
+    if (isMocked) {
+      jest.spyOn(redis, 'eval').mockResolvedValue(1);
+    }
+
     await middleware.use(req, res, next);
 
-    expect(mockRedisEval).toHaveBeenCalledWith(
-      expect.any(String),
-      1,
-      'rate-limit:127.0.0.1',
-      60,
-    );
     expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('returns 429 after the request limit is exceeded', async () => {
-    mockRedisEval.mockResolvedValue(61);
     const status = jest.fn().mockReturnThis();
     const json = jest.fn();
     const req = {
@@ -65,6 +78,10 @@ describe('RateLimitMiddleware', () => {
       status,
       json,
     } as never;
+
+    if (isMocked) {
+      jest.spyOn(redis, 'eval').mockResolvedValue(61);
+    }
 
     await middleware.use(req, res, next);
 

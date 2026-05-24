@@ -1,12 +1,13 @@
-import { execSync } from 'child_process';
+import { Test, TestingModule } from '@nestjs/testing';
 import {
   PostgreSqlContainer,
   StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
-import { TestingModule, Test } from '@nestjs/testing';
-import { PrismaService } from '../../prisma/prisma.service';
-import { PrismaModule } from '../../prisma/prisma.module';
+import { RedisContainer, StartedRedisContainer } from '@testcontainers/redis';
+import { execSync } from 'child_process';
 import { validate } from '../../lib/env';
+import { PrismaModule } from '../../prisma/prisma.module';
+import { PrismaService } from '../../prisma/prisma.service';
 // import { UsersModule } from '../../users/users.module';
 
 jest.setTimeout(60000);
@@ -28,6 +29,10 @@ export interface TestContext {
   module: TestingModule;
   prisma: PrismaService;
   container: StartedPostgreSqlContainer;
+}
+
+export interface RedisTestContext extends TestContext {
+  redisContainer: StartedRedisContainer;
 }
 
 export async function setupTestDb(): Promise<TestContext> {
@@ -70,11 +75,39 @@ export async function setupTestDb(): Promise<TestContext> {
   return { module, prisma, container };
 }
 
-export async function teardownTestDb(ctx: TestContext): Promise<void> {
+export async function setupTestDbWithRedis(): Promise<RedisTestContext> {
+  const redisContainer = await new RedisContainer('redis:7-alpine').start();
+
+  process.env.REDIS_HOST = redisContainer.getHost();
+  process.env.REDIS_PORT = String(redisContainer.getPort());
+
+  const dbContext = await setupTestDb();
+
+  return {
+    ...dbContext,
+    redisContainer,
+  };
+}
+
+export async function setupRedisTestContainer(): Promise<StartedRedisContainer> {
+  const redisContainer = await new RedisContainer('redis:7-alpine').start();
+
+  process.env.REDIS_HOST = redisContainer.getHost();
+  process.env.REDIS_PORT = String(redisContainer.getPort());
+
+  return redisContainer;
+}
+
+export async function teardownTestDb(
+  ctx: TestContext | RedisTestContext,
+): Promise<void> {
   if (!ctx) {
     return;
   }
   await ctx.module.close();
+  if ('redisContainer' in ctx) {
+    await ctx.redisContainer.stop();
+  }
   await ctx.container.stop();
 }
 
@@ -83,5 +116,16 @@ export async function teardownTestDb(ctx: TestContext): Promise<void> {
  * Order matters — respect FK constraints.
  */
 export async function cleanDatabase(prisma: PrismaService): Promise<void> {
-  await prisma.$transaction([prisma.user.deleteMany()]);
+  // Delete in order that respects foreign key constraints.
+  await prisma.$transaction([
+    prisma.enrollment.deleteMany(),
+    prisma.grade.deleteMany(),
+    prisma.attendanceRecord.deleteMany(),
+    prisma.attendanceSession.deleteMany(),
+    prisma.evaluationWeight.deleteMany(),
+    prisma.course.deleteMany(),
+    prisma.session.deleteMany(),
+    prisma.account.deleteMany(),
+    prisma.user.deleteMany(),
+  ]);
 }

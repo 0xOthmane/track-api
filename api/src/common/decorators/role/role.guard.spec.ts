@@ -4,18 +4,29 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { auth } from '../lib/auth';
 import { Role, Session, User } from '../generated/prisma/client';
-import { RoleGuard } from './role.guard';
 import { ROLES_KEY } from './role.decorator';
+import { setupTestDb, teardownTestDb } from '../../utils/test/setup-tests';
+import { createTestAuth } from '../../utils/test/auth-helper';
 
-jest.mock('../lib/auth', () => ({
-  auth: {
-    api: {
-      getSession: jest.fn(),
-    },
-  },
-}));
+let auth: any;
+let RoleGuard: any;
+let ctx: Awaited<ReturnType<typeof setupTestDb>> | null = null;
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  // create a better-auth instance bound to the test Prisma client
+  await createTestAuth(ctx.prisma);
+
+  // require auth and the guard after DATABASE_URL is set so modules initialize against test DB
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  auth = require('../lib/auth').auth;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  RoleGuard = require('./role.guard').RoleGuard;
+});
+
+afterAll(async () => {
+  if (ctx) await teardownTestDb(ctx);
+});
 
 const createContext = (
   headers: Record<string, string> = {},
@@ -43,7 +54,7 @@ const createContext = (
   };
 };
 
-type AuthSession = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+type AuthSession = { user: User; session: Session };
 
 const createUser = (overrides: Partial<User> = {}): User => ({
   id: 'user-id',

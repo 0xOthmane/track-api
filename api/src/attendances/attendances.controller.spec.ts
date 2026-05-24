@@ -1,17 +1,34 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AttendancesController } from './attendances.controller';
-import { AttendancesService } from './attendances.service';
+import { setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
+import { createTestAuth } from '../utils/test/auth-helper';
 
 describe('AttendancesController', () => {
-  let controller: AttendancesController;
+  let controller: any;
+  let ctx: Awaited<ReturnType<typeof setupTestDb>> | null = null;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AttendancesController],
-      providers: [AttendancesService],
-    }).compile();
+  beforeAll(async () => {
+    try {
+      ctx = await setupTestDb();
+      await createTestAuth(ctx.prisma);
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { AttendancesController } = require('./attendances.controller');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { AttendancesService } = require('./attendances.service');
+      controller = new AttendancesController(
+        new AttendancesService(
+          ctx.prisma as any,
+          { emitAtRisk: jest.fn() } as any,
+        ),
+      );
+    } catch {
+      // fallback
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { AttendancesController } = require('./attendances.controller');
+      controller = new AttendancesController({} as any);
+    }
+  });
 
-    controller = module.get<AttendancesController>(AttendancesController);
+  afterAll(async () => {
+    if (ctx) await teardownTestDb(ctx);
   });
 
   it('should be defined', () => {

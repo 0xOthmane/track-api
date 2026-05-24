@@ -1,44 +1,59 @@
-const mockRedisPing = jest.fn();
-
-jest.mock('./lib/redis', () => ({
-  redis: {
-    ping: mockRedisPing,
-  },
-}));
-
-import { Test, TestingModule } from '@nestjs/testing';
 import { AppService } from './app.service';
-import { PrismaService } from './prisma/prisma.service';
+import { redis } from './lib/redis';
+import {
+  RedisTestContext,
+  setupTestDbWithRedis,
+  teardownTestDb,
+} from './utils/test/setup-tests';
 
 describe('AppService', () => {
+  let ctx: RedisTestContext;
   let service: AppService;
   let prismaService: {
     $queryRaw: jest.Mock;
   };
+  let isMocked = false;
+  let redisStopped = false;
 
   beforeEach(async () => {
-    prismaService = {
-      $queryRaw: jest.fn(),
-    };
-    mockRedisPing.mockReset();
+    isMocked = false;
+    redisStopped = false;
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AppService,
-        {
-          provide: PrismaService,
-          useValue: prismaService,
-        },
-      ],
-    }).compile();
+    try {
+      ctx = await setupTestDbWithRedis();
+      service = new AppService(ctx.prisma);
+    } catch {
+      isMocked = true;
+      prismaService = {
+        $queryRaw: jest.fn(),
+      };
+      service = new AppService(prismaService as never);
+    }
+  });
 
-    service = module.get<AppService>(AppService);
-    jest.clearAllMocks();
+  afterEach(async () => {
+    jest.restoreAllMocks();
+
+    if (isMocked) {
+      return;
+    }
+
+    redis.disconnect();
+
+    if (redisStopped) {
+      await ctx.module.close();
+      await ctx.container.stop();
+      return;
+    }
+
+    await teardownTestDb(ctx);
   });
 
   it('returns ok when the database and redis are connected', async () => {
-    prismaService.$queryRaw.mockResolvedValue({});
-    mockRedisPing.mockResolvedValue('PONG');
+    if (isMocked) {
+      prismaService.$queryRaw.mockResolvedValue({});
+      jest.spyOn(redis, 'ping').mockResolvedValue('PONG');
+    }
 
     await expect(service.getHealth()).resolves.toEqual({
       status: 'ok',
@@ -46,8 +61,13 @@ describe('AppService', () => {
   });
 
   it('returns degraded when either dependency is unavailable', async () => {
-    prismaService.$queryRaw.mockRejectedValue(new Error('db down'));
-    mockRedisPing.mockResolvedValue('PONG');
+    if (isMocked) {
+      prismaService.$queryRaw.mockRejectedValue(new Error('db down'));
+      jest.spyOn(redis, 'ping').mockResolvedValue('PONG');
+    } else {
+      redisStopped = true;
+      await ctx.redisContainer.stop();
+    }
 
     await expect(service.getHealth()).resolves.toEqual({
       status: 'degraded',
