@@ -16,6 +16,9 @@ import { AttendancesService } from './attendances.service';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 import { CreateAttendanceRecordsDto } from './dto/create-attendance-records.dto';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
+import { CurrentUser } from '../common/decorators/current-user/current-user.decorator';
+import { type User } from '../generated/prisma/client';
+import { ApiCreatedResponse } from '@nestjs/swagger';
 
 @Controller('/courses/:courseId/attendance-sessions')
 @UseGuards(RoleGuard, OwnerGuard)
@@ -28,6 +31,9 @@ export class AttendancesController {
     model: 'course',
     field: 'teacherId',
     param: 'courseId',
+  })
+  @ApiCreatedResponse({
+    description: 'The attendance session has been successfully created.',
   })
   async createSession(
     @Param('courseId') courseId: string,
@@ -46,6 +52,9 @@ export class AttendancesController {
     field: 'teacherId',
     param: 'courseId',
   })
+  @ApiCreatedResponse({
+    description: 'The attendance records have been successfully created.',
+  })
   async createRecord(
     @Param('courseId') courseId: string,
     @Param('sessionId') sessionId: string,
@@ -57,26 +66,47 @@ export class AttendancesController {
       createAttendanceRecordsDto.records,
     );
   }
-  @Get()
-  findAll() {
-    return this.attendancesService.findAll();
+  @Get(':sessionId/stats')
+  @Role('TEACHER', 'ADMIN')
+  @Owner({
+    model: 'course',
+    field: 'teacherId',
+    param: 'courseId',
+  })
+  @ApiCreatedResponse({
+    description: 'The attendance session statistics.',
+  })
+  async getStats(@Param('sessionId') sessionId: string) {
+    return await this.attendancesService.getStats(sessionId);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.attendancesService.findOne(+id);
+  @Get('student-records')
+  @Role('STUDENT')
+  @ApiCreatedResponse({
+    description:
+      'The attendance records for the student in the specified course.',
+  })
+  async getStudentRecords(
+    @Param('courseId') courseId: string,
+    @CurrentUser() user: User,
+  ) {
+    return await this.attendancesService.getStudentRecords(courseId, user.id);
   }
 
   @Patch(':id')
-  update(
+  @Role('TEACHER')
+  @ApiCreatedResponse({
+    description: 'The attendance record has been successfully updated.',
+  })
+  async updateSessionRecord(
     @Param('id') id: string,
     @Body() updateAttendanceRecordDto: UpdateAttendanceRecordDto,
+    @CurrentUser() user: User,
   ) {
-    return this.attendancesService.update(+id, updateAttendanceRecordDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.attendancesService.remove(+id);
+    return await this.attendancesService.updateSessionRecord(
+      id,
+      updateAttendanceRecordDto,
+      user.id,
+    );
   }
 }

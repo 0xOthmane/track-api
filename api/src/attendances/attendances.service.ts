@@ -232,7 +232,6 @@ export class AttendancesService {
     return this.calculateAttendanceMetrics(resolvedTotalCount, presentCount);
   }
 
-  // Get attendance stats, teacher can only see stats for their courses and admin sees all
   async getStats(sessionId: string) {
     const session = await this.prisma.attendanceSession.findUnique({
       where: {
@@ -259,33 +258,85 @@ export class AttendancesService {
     };
   }
 
-  findAll() {
-    return `This action returns all attendances`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} attendance`;
-  }
-
-  update(id: number, _updateAttendanceRecordDto: UpdateAttendanceRecordDto) {
-    void _updateAttendanceRecordDto;
-    return `This action updates a #${id} attendance`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} attendance`;
-  }
-
-  // Student sees only their attendance records
-  async getStudentRecords(studentId: string) {
-    const records = await this.prisma.attendanceRecord.findMany({
+  async updateSessionRecord(
+    id: string,
+    updateAttendanceRecordDto: UpdateAttendanceRecordDto,
+    userId: string,
+  ) {
+    // check if the course session owned by the teacher
+    const record = await this.prisma.attendanceRecord.findUnique({
       where: {
-        studentId,
+        id,
       },
-      include: {
-        session: true,
+      select: {
+        session: {
+          select: {
+            course: {
+              select: {
+                teacherId: true,
+              },
+            },
+          },
+        },
       },
     });
-    return records;
+    if (!record) {
+      throw new NotFoundException('Attendance record not found');
+    }
+    if (record.session.course.teacherId !== userId) {
+      throw new ForbiddenException(
+        'You are not the owner of this attendance record',
+      );
+    }
+    try {
+      const updatedRecord = await this.prisma.attendanceRecord.update({
+        where: {
+          id,
+        },
+        data: {
+          present: updateAttendanceRecordDto.present,
+        },
+      });
+      return updatedRecord;
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2003') {
+          throw new ForbiddenException(
+            'Foreign key constraint failed: ' + error.message,
+          );
+        }
+      }
+      console.error('Error updating attendance record:', error);
+      throw error;
+    }
+  }
+
+  async getStudentRecords(courseId: string, studentId: string) {
+    try {
+      const records = await this.prisma.attendanceRecord.findMany({
+        where: {
+          studentId,
+          session: {
+            is: {
+              courseId,
+            },
+          },
+        },
+        include: {
+          session: true,
+        },
+      });
+      return records;
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2003') {
+          throw new ForbiddenException(
+            'Foreign key constraint failed: ' + error.message,
+          );
+        }
+      }
+      console.error('Error fetching student attendance records:', error);
+      throw error;
+    }
   }
 }

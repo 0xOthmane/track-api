@@ -8,6 +8,7 @@ type PrismaModel =
   | 'enrollment'
   | 'evaluationWeight'
   | 'user'
+  | 'attendanceRecord'
   | 'attendanceSession';
 
 export type OwnerOptions = {
