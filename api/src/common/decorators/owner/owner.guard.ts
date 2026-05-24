@@ -72,6 +72,13 @@ export class OwnerGuard implements CanActivate {
           },
         });
         break;
+      case 'attendanceSession':
+        ressource = await this.prisma.attendanceSession.findUnique({
+          where: {
+            id: resourceId,
+          },
+        });
+        break;
       default:
         throw new BadRequestException('Invalid model');
     }

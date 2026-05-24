@@ -76,6 +76,9 @@ export class GradesImportProcessor extends WorkerHost {
       } catch (error) {
         const message = this.getRowErrorMessage(error);
         errors.push({ rowNumber: row.rowNumber, message });
+        this.logger.warn(
+          `Failed to import row ${row.rowNumber}: ${message} (correlationId=${correlationId ?? 'n/a'})`,
+        );
       }
 
       const processed = successCount + errors.length;
@@ -161,14 +164,29 @@ export class GradesImportProcessor extends WorkerHost {
       throw new BadRequestException('Student id or email is required');
     }
 
-    const identifierType = studentEmail
-      ? 'email'
-      : identifier.includes('@')
-        ? 'email'
-        : 'id';
+    // Determine identifier type:
+    // - If headers were provided, prefer the explicit header presence.
+    // - Otherwise, fall back to a simple heuristic (presence of '@').
+    let identifierType: 'email' | 'id';
+    if (headerMap) {
+      if (headerMap.studentEmail !== undefined) {
+        identifierType = 'email';
+      } else if (headerMap.studentId !== undefined) {
+        identifierType = 'id';
+      } else {
+        identifierType = identifier.includes('@') ? 'email' : 'id';
+      }
+    } else {
+      identifierType = identifier.includes('@') ? 'email' : 'id';
+    }
 
-    const normalizedType = evaluationType?.toUpperCase();
-    if (!normalizedType || !(normalizedType in EvaluationType)) {
+    const normalizedType = String(evaluationType ?? '').toUpperCase();
+    if (
+      !normalizedType ||
+      !Object.values(EvaluationType).includes(
+        normalizedType as unknown as EvaluationType,
+      )
+    ) {
       throw new BadRequestException('Invalid evaluation type');
     }
 

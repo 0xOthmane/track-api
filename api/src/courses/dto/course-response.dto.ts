@@ -32,10 +32,10 @@ export class CourseResponseDto {
   @Expose()
   readonly semester!: string;
 
-  @ApiProperty({ type: () => TeacherResponseDto })
+  @ApiProperty({ type: () => TeacherResponseDto, nullable: true })
   @Expose()
   @Type(() => TeacherResponseDto)
-  readonly teacher!: TeacherResponseDto;
+  readonly teacher!: TeacherResponseDto | null;
 }
 
 export class CoursesListResponseDto {
