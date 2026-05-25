@@ -3,7 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 export function buildFixtures(module: TestingModule) {
   const prisma = module.get<PrismaService>(PrismaService);
-  //   const usersService = module.get(UsersService);
+    // const usersService = module.get(UsersService);
+  const coursesService = module.get('CoursesService');
   //   type CreatedUser = Awaited<ReturnType<typeof usersService.create>>;
   //   return {
   //     user(override?: { email?: string; name?: string; password?: string }) {
@@ -47,7 +48,7 @@ export function buildFixtures(module: TestingModule) {
       semester?: string;
       teacherId?: string | null;
     }) {
-      return prisma.course.create({
+      return coursesService.create({
         data: {
           name: override?.name ?? `Test Course ${Date.now()}`,
           description: override?.description ?? 'Fixture course',

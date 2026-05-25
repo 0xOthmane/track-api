@@ -20,13 +20,28 @@ export interface RedisClient {
   disconnect(): void;
 }
 
-let redisClient: RedisClient | null = null;
+let redisClient: Redis | null = null;
 
-function createRedisClient(): RedisClient {
+function createRedisClient(): Redis {
   if (!redisClient) {
+    const host = process.env.REDIS_HOST ?? env.REDIS_HOST;
+    const port = process.env.REDIS_PORT
+      ? Number(process.env.REDIS_PORT)
+      : env.REDIS_PORT;
+
+    const isTest = process.env.NODE_ENV === 'test';
+
     redisClient = new Redis({
-      host: env.REDIS_HOST,
-      port: env.REDIS_PORT,
+      host,
+      port,
+      ...(isTest
+        ? {
+            enableOfflineQueue: false,
+            maxRetriesPerRequest: 0,
+            reconnectOnError: () => false,
+            retryStrategy: () => null,
+          }
+        : {}),
     });
   }
 
@@ -50,10 +65,19 @@ export const redis: RedisClient = {
     return createRedisClient().del(...keys);
   },
   quit() {
-    return createRedisClient().quit();
+    if (!redisClient) {
+      return Promise.resolve('OK');
+    }
+
+    return redisClient.quit();
   },
   disconnect() {
-    createRedisClient().disconnect();
+    if (!redisClient) {
+      return;
+    }
+
+    redisClient.disconnect();
+    redisClient = null;
   },
 };
 
@@ -62,11 +86,27 @@ export async function closeRedisClient() {
     return;
   }
 
-  try {
-    await redisClient.quit();
-  } catch {
-    redisClient.disconnect();
+  const client = redisClient;
+  redisClient = null;
+
+  if (client.status === 'end') {
+    return;
   }
 
-  redisClient = null;
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      client.removeListener('end', finish);
+      client.removeListener('close', finish);
+      resolve();
+    };
+
+    client.once('end', finish);
+    client.once('close', finish);
+
+    try {
+      client.disconnect();
+    } catch {
+      finish();
+    }
+  });
 }

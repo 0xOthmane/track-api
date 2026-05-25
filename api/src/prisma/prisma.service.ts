@@ -17,16 +17,22 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  private readonly databaseUrl: string;
+
   constructor() {
+    const databaseUrl = process.env.DATABASE_URL ?? env.DATABASE_URL;
+
     super({
       adapter: new PrismaPg({
-        connectionString: env.DATABASE_URL,
+        connectionString: databaseUrl,
       }),
     });
+
+    this.databaseUrl = databaseUrl;
   }
 
   async onModuleInit() {
-    if (!env.DATABASE_URL) {
+    if (!this.databaseUrl) {
       return;
     }
 

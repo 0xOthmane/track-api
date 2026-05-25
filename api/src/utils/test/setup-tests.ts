@@ -6,6 +6,7 @@ import {
 import { RedisContainer, StartedRedisContainer } from '@testcontainers/redis';
 import { execSync } from 'child_process';
 import { validate } from '../../lib/env';
+import { redis } from '../../lib/redis';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PrismaService } from '../../prisma/prisma.service';
 // import { UsersModule } from '../../users/users.module';
@@ -28,21 +29,38 @@ jest.setTimeout(60000);
 export interface TestContext {
   module: TestingModule;
   prisma: PrismaService;
-  container: StartedPostgreSqlContainer;
+  pgContainer: StartedPostgreSqlContainer;
+  redisContainer?: StartedRedisContainer;
 }
 
-export interface RedisTestContext extends TestContext {
-  redisContainer: StartedRedisContainer;
+const REDIS_READY_RETRIES = 10;
+const REDIS_READY_DELAY_MS = 250;
+
+async function waitForRedisReady() {
+  for (let attempt = 0; attempt < REDIS_READY_RETRIES; attempt += 1) {
+    try {
+      const pong = await redis.ping();
+      if (pong === 'PONG') {
+        return;
+      }
+    } catch {
+      // ignore and retry
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, REDIS_READY_DELAY_MS));
+  }
+
+  throw new Error('Redis did not become ready in time');
 }
 
 export async function setupTestDb(): Promise<TestContext> {
-  const container = await new PostgreSqlContainer('postgres:18-alpine')
+  const pgContainer = await new PostgreSqlContainer('postgres:18-alpine')
     .withDatabase('test')
     .withUsername('test')
     .withPassword('test')
     .start();
 
-  const url = container.getConnectionUri();
+  const url = pgContainer.getConnectionUri();
 
   // Set DATABASE_URL before the NestJS module boots so PrismaService picks it up
   process.env.DATABASE_URL = url;
@@ -72,16 +90,18 @@ export async function setupTestDb(): Promise<TestContext> {
 
   const prisma = module.get<PrismaService>(PrismaService);
 
-  return { module, prisma, container };
+  return { module, prisma, pgContainer };
 }
 
-export async function setupTestDbWithRedis(): Promise<RedisTestContext> {
+export async function setupTestDbWithRedis(): Promise<TestContext> {
   const redisContainer = await new RedisContainer('redis:7-alpine').start();
 
   process.env.REDIS_HOST = redisContainer.getHost();
   process.env.REDIS_PORT = String(redisContainer.getPort());
 
   const dbContext = await setupTestDb();
+
+  await waitForRedisReady();
 
   return {
     ...dbContext,
@@ -95,20 +115,20 @@ export async function setupRedisTestContainer(): Promise<StartedRedisContainer> 
   process.env.REDIS_HOST = redisContainer.getHost();
   process.env.REDIS_PORT = String(redisContainer.getPort());
 
+  await waitForRedisReady();
+
   return redisContainer;
 }
 
-export async function teardownTestDb(
-  ctx: TestContext | RedisTestContext,
-): Promise<void> {
+export async function teardownTestDb(ctx: TestContext): Promise<void> {
   if (!ctx) {
     return;
   }
   await ctx.module.close();
-  if ('redisContainer' in ctx) {
+  if (ctx.redisContainer) {
     await ctx.redisContainer.stop();
   }
-  await ctx.container.stop();
+  await ctx.pgContainer.stop();
 }
 
 /**

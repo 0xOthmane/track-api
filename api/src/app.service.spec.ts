@@ -1,17 +1,16 @@
 import { AppService } from './app.service';
-import { redis } from './lib/redis';
+import { closeRedisClient, redis } from './lib/redis';
+import { PrismaService } from './prisma/prisma.service';
 import {
-  RedisTestContext,
   setupTestDbWithRedis,
   teardownTestDb,
+  TestContext,
 } from './utils/test/setup-tests';
 
 describe('AppService', () => {
-  let ctx: RedisTestContext;
+  let ctx: TestContext;
   let service: AppService;
-  let prismaService: {
-    $queryRaw: jest.Mock;
-  };
+  let prismaService: jest.Mocked<Pick<PrismaService, '$queryRaw'>>;
   let isMocked = false;
   let redisStopped = false;
 
@@ -38,11 +37,11 @@ describe('AppService', () => {
       return;
     }
 
-    redis.disconnect();
+    await closeRedisClient();
 
     if (redisStopped) {
       await ctx.module.close();
-      await ctx.container.stop();
+      await ctx.pgContainer.stop();
       return;
     }
 
@@ -66,7 +65,7 @@ describe('AppService', () => {
       jest.spyOn(redis, 'ping').mockResolvedValue('PONG');
     } else {
       redisStopped = true;
-      await ctx.redisContainer.stop();
+      await ctx.redisContainer!.stop();
     }
 
     await expect(service.getHealth()).resolves.toEqual({

@@ -1,46 +1,53 @@
-jest.mock('./lib/redis', () => ({
-  redis: {
-    ping: jest.fn(),
-  },
-}));
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { closeRedisClient, redis } from './lib/redis';
+import { PrismaService } from './prisma/prisma.service';
+import {
+  setupTestDbWithRedis,
+  teardownTestDb,
+  TestContext,
+} from './utils/test/setup-tests';
 
 describe('AppController', () => {
+  let ctx: TestContext;
+  let moduleRef: TestingModule;
   let appController: AppController;
-  let appService: {
-    getHealth: jest.Mock;
-  };
 
   beforeEach(async () => {
-    appService = {
-      getHealth: jest.fn(),
-    };
-
-    const app: TestingModule = await Test.createTestingModule({
+    ctx = await setupTestDbWithRedis();
+    moduleRef = await Test.createTestingModule({
+      imports: [],
       controllers: [AppController],
-      providers: [
-        {
-          provide: AppService,
-          useValue: appService,
-        },
-      ],
+      providers: [AppService, { provide: PrismaService, useValue: ctx.prisma }],
     }).compile();
+    appController = moduleRef.get(AppController);
+  });
 
-    appController = app.get<AppController>(AppController);
+  afterEach(async () => {
+    await closeRedisClient();
+    await moduleRef.close();
+    await teardownTestDb(ctx);
   });
 
   describe('health', () => {
     it('should return the service health payload', async () => {
-      appService.getHealth.mockResolvedValue({
-        status: 'ok',
-      });
+      const result = await appController.getHealth();
+      expect(result).toEqual({ status: 'ok' });
+    });
 
-      await expect(appController.getHealth()).resolves.toEqual({
-        status: 'ok',
-      });
+    it('should return degraded if the redis is unavailable', async () => {
+      if (ctx.redisContainer) {
+        await ctx.redisContainer.stop();
+        const result = await appController.getHealth();
+        expect(result).toEqual({ status: 'degraded' });
+      }
+    });
+
+    it('should return degraded if the database is unavailable', async () => {
+      await ctx.pgContainer.stop();
+      const result = await appController.getHealth();
+      expect(result).toEqual({ status: 'degraded' });
     });
   });
 });

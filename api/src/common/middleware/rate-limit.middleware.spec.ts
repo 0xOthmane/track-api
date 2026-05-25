@@ -1,4 +1,4 @@
-import { redis } from '../../lib/redis';
+import { closeRedisClient, redis } from '../../lib/redis';
 import { setupRedisTestContainer } from '../../utils/test/setup-tests';
 import { RateLimitMiddleware } from './rate-limit.middleware';
 
@@ -28,7 +28,7 @@ describe('RateLimitMiddleware', () => {
       return;
     }
 
-    redis.disconnect();
+    await closeRedisClient();
     await redisContainer.stop();
   });
 
