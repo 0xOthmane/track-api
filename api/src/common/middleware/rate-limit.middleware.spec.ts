@@ -1,96 +1,62 @@
+import express from 'express';
+import request from 'supertest';
 import { closeRedisClient, redis } from '../../lib/redis';
 import { setupRedisTestContainer } from '../../utils/test/setup-tests';
 import { RateLimitMiddleware } from './rate-limit.middleware';
 
 describe('RateLimitMiddleware', () => {
   let redisContainer: Awaited<ReturnType<typeof setupRedisTestContainer>>;
-  let middleware: RateLimitMiddleware;
-  let next: jest.Mock;
-  let isMocked = false;
+  let app: express.Express;
 
-  beforeEach(async () => {
-    isMocked = false;
+  beforeAll(async () => {
+    redisContainer = await setupRedisTestContainer();
 
-    try {
-      redisContainer = await setupRedisTestContainer();
-    } catch {
-      isMocked = true;
-    }
-
-    middleware = new RateLimitMiddleware();
-    next = jest.fn();
+    app = express();
+    app.set('trust proxy', true);
+    app.use((req, res, next) => new RateLimitMiddleware().use(req, res, next));
+    app.get('/admin/stats', (_req, res) => res.status(200).json({ ok: true }));
+    app.get('/courses', (_req, res) => res.status(200).json({ ok: true }));
   });
 
-  afterEach(async () => {
-    jest.restoreAllMocks();
-
-    if (isMocked) {
-      return;
-    }
-
+  afterAll(async () => {
     await closeRedisClient();
     await redisContainer.stop();
   });
 
-  it('skips exempt routes without touching redis', async () => {
-    const req = {
-      originalUrl: '/admin/stats',
-      ip: '127.0.0.1',
-      socket: { remoteAddress: '127.0.0.1' },
-    } as never;
-    const res = {} as never;
-
-    if (isMocked) {
-      jest.spyOn(redis, 'eval').mockResolvedValue(1);
-    }
-
-    await middleware.use(req, res, next);
-
-    expect(next).toHaveBeenCalledTimes(1);
+  beforeEach(async () => {
+    await redis.del('rate-limit:127.0.0.1');
   });
 
-  it('allows requests under the limit and writes a 60 second window', async () => {
-    const req = {
-      originalUrl: '/courses',
-      ip: '127.0.0.1',
-      socket: { remoteAddress: '127.0.0.1' },
-    } as never;
-    const res = {} as never;
+  it('skips exempt routes without rate limiting', async () => {
+    await request(app)
+      .get('/admin/stats')
+      .set('x-forwarded-for', '127.0.0.1')
+      .expect(200);
+  });
 
-    if (isMocked) {
-      jest.spyOn(redis, 'eval').mockResolvedValue(1);
-    }
-
-    await middleware.use(req, res, next);
-
-    expect(next).toHaveBeenCalledTimes(1);
+  it('allows requests under the limit', async () => {
+    await request(app)
+      .get('/courses')
+      .set('x-forwarded-for', '127.0.0.1')
+      .expect(200);
   });
 
   it('returns 429 after the request limit is exceeded', async () => {
-    const status = jest.fn().mockReturnThis();
-    const json = jest.fn();
-    const req = {
-      originalUrl: '/courses',
-      ip: '127.0.0.1',
-      socket: { remoteAddress: '127.0.0.1' },
-    } as never;
-    const res = {
-      status,
-      json,
-    } as never;
+    for (let i = 0; i < 61; i += 1) {
+      const response = await request(app)
+        .get('/courses')
+        .set('x-forwarded-for', '127.0.0.1');
 
-    if (isMocked) {
-      jest.spyOn(redis, 'eval').mockResolvedValue(61);
+      if (i < 60) {
+        expect(response.status).toBe(200);
+      } else {
+        expect(response.status).toBe(429);
+        expect(response.body).toEqual({
+          statusCode: 429,
+          message: 'Too many requests. Please try again later.',
+          error: 'Too Many Requests',
+        });
+      }
     }
-
-    await middleware.use(req, res, next);
-
-    expect(status).toHaveBeenCalledWith(429);
-    expect(json).toHaveBeenCalledWith({
-      statusCode: 429,
-      message: 'Too many requests. Please try again later.',
-      error: 'Too Many Requests',
-    });
-    expect(next).not.toHaveBeenCalled();
   });
 });

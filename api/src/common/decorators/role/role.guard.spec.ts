@@ -1,41 +1,69 @@
+import 'reflect-metadata';
 import {
   ExecutionContext,
   ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Role, Session, User } from '../generated/prisma/client';
+import { Role } from '../../generated/prisma/client';
 import { ROLES_KEY } from './role.decorator';
-import { setupTestDb, teardownTestDb } from '../../utils/test/setup-tests';
-import { createTestAuth } from '../../utils/test/auth-helper';
+import { auth as authType } from '../../../lib/auth';
+import { RoleGuard as RoleGuardType } from './role.guard';
+import { setupTestDb, teardownTestDb } from '../../../utils/test/setup-tests';
 
-let auth: any;
-let RoleGuard: any;
-let ctx: Awaited<ReturnType<typeof setupTestDb>> | null = null;
-beforeAll(async () => {
-  ctx = await setupTestDb();
-  // create a better-auth instance bound to the test Prisma client
-  await createTestAuth(ctx.prisma);
+let auth: typeof authType;
+let RoleGuard: typeof RoleGuardType;
+let ctx: Awaited<ReturnType<typeof setupTestDb>>;
 
-  // require auth and the guard after DATABASE_URL is set so modules initialize against test DB
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  auth = require('../lib/auth').auth;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  RoleGuard = require('./role.guard').RoleGuard;
-});
+const getSetCookies = (headers: Headers) => {
+  const typed = headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof typed.getSetCookie === 'function') {
+    return typed.getSetCookie();
+  }
+  const header = headers.get('set-cookie');
+  return header ? [header] : [];
+};
 
-afterAll(async () => {
-  if (ctx) await teardownTestDb(ctx);
-});
+const buildCookieHeader = (headers: Headers) => {
+  const cookies = getSetCookies(headers)
+    .map((value) => value.split(';')[0])
+    .filter(Boolean);
+  return cookies.join('; ');
+};
+
+const createSessionCookie = async (role: Role) => {
+  const email = `role-${role.toLowerCase()}-${Date.now()}@test.local`;
+  const password = 'StrongPassword123';
+
+  await auth.api.createUser({
+    body: {
+      email,
+      password,
+      name: `Role ${role}`,
+      role,
+    },
+  });
+
+  const signIn = await auth.api.signInEmail({
+    body: { email, password, rememberMe: false },
+    returnHeaders: true,
+  });
+
+  return buildCookieHeader(signIn.headers);
+};
 
 const createContext = (
   headers: Record<string, string> = {},
-): ExecutionContext => {
-  const handler = () => undefined;
+  handler?: () => void,
+  classRef?: new () => void,
+) => {
+  const request = { headers } as { headers: Record<string, string> };
+  const ctxHandler = handler ?? (() => undefined);
   class TestClass {}
-  return {
+  const ctxClass = classRef ?? TestClass;
+  const context: ExecutionContext = {
     switchToHttp: () => ({
-      getRequest: () => ({ headers }),
+      getRequest: () => request,
     }),
     switchToRpc: () => ({
       getContext: () => undefined,
@@ -46,117 +74,67 @@ const createContext = (
       getData: () => undefined,
       getPattern: () => undefined,
     }),
-    getHandler: () => handler,
-    getClass: () => TestClass,
+    getHandler: () => ctxHandler,
+    getClass: () => ctxClass,
     getArgs: () => [],
     getArgByIndex: () => undefined,
     getType: () => 'http',
   };
+  return { context, request, handler: ctxHandler, ctxClass };
 };
 
-type AuthSession = { user: User; session: Session };
-
-const createUser = (overrides: Partial<User> = {}): User => ({
-  id: 'user-id',
-  name: 'Test User',
-  email: 'user@example.com',
-  emailVerified: false,
-  image: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  role: Role.USER,
-  ...overrides,
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  ({ auth } = await import('../../lib/auth'));
+  ({ RoleGuard } = await import('./role.guard'));
 });
 
-const createSession = (overrides: Partial<Session> = {}): Session => ({
-  id: 'session-id',
-  expiresAt: new Date(Date.now() + 60_000),
-  token: 'session-token',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  ipAddress: null,
-  userAgent: null,
-  userId: 'user-id',
-  ...overrides,
+afterAll(async () => {
+  if (ctx) await teardownTestDb(ctx);
 });
-
-const createAuthSession = (
-  overrides: Partial<AuthSession> = {},
-): AuthSession => {
-  const user = overrides.user ?? createUser();
-  const session = overrides.session ?? createSession({ userId: user.id });
-  return {
-    user,
-    session,
-    ...overrides,
-  };
-};
 
 describe('RoleGuard', () => {
   let reflector: Reflector;
-  let guard: RoleGuard;
+  let guard: InstanceType<typeof RoleGuard>;
 
   beforeEach(() => {
     reflector = new Reflector();
     guard = new RoleGuard(reflector);
-    jest.clearAllMocks();
   });
 
   it('throws UnauthorizedException when not authenticated', async () => {
-    jest.spyOn(auth.api, 'getSession').mockResolvedValue(null);
+    const { context } = createContext();
 
-    await expect(guard.canActivate(createContext())).rejects.toBeInstanceOf(
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
   it('allows when no roles are required', async () => {
-    jest.spyOn(auth.api, 'getSession').mockResolvedValue(createAuthSession());
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
+    const cookieHeader = await createSessionCookie(Role.USER);
+    const { context, request } = createContext({ cookie: cookieHeader });
 
-    await expect(guard.canActivate(createContext())).resolves.toBe(true);
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(request).toHaveProperty('user');
   });
 
   it('throws ForbiddenException when role is missing', async () => {
-    jest.spyOn(auth.api, 'getSession').mockResolvedValue(createAuthSession());
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
+    const cookieHeader = await createSessionCookie(Role.USER);
+    const handler = () => undefined;
+    Reflect.defineMetadata(ROLES_KEY, ['ADMIN'], handler);
+    const { context } = createContext({ cookie: cookieHeader }, handler);
 
-    await expect(guard.canActivate(createContext())).rejects.toBeInstanceOf(
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
 
   it('allows when role is present', async () => {
-    const user = createUser({ role: Role.ADMIN });
-    jest
-      .spyOn(auth.api, 'getSession')
-      .mockResolvedValue(createAuthSession({ user }));
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
+    const cookieHeader = await createSessionCookie(Role.ADMIN);
+    const handler = () => undefined;
+    Reflect.defineMetadata(ROLES_KEY, ['ADMIN'], handler);
+    const { context } = createContext({ cookie: cookieHeader }, handler);
 
-    await expect(guard.canActivate(createContext())).resolves.toBe(true);
-  });
-
-  it('defaults to USER role when missing', async () => {
-    const user = {
-      ...createUser(),
-      role: 'USER',
-    } as AuthSession['user'];
-    jest
-      .spyOn(auth.api, 'getSession')
-      .mockResolvedValue(createAuthSession({ user }));
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['USER']);
-
-    await expect(guard.canActivate(createContext())).resolves.toBe(true);
-  });
-
-  it('reads required roles using the metadata key', async () => {
-    const getSpy = jest
-      .spyOn(reflector, 'getAllAndOverride')
-      .mockReturnValue([]);
-    jest.spyOn(auth.api, 'getSession').mockResolvedValue(createAuthSession());
-
-    await guard.canActivate(createContext());
-
-    expect(getSpy).toHaveBeenCalledWith(ROLES_KEY, expect.any(Array));
+    await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 });
