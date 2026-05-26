@@ -19,4 +19,11 @@ export async function createTestAuth(prisma: PrismaService) {
   return instance;
 }
 
+export async function installTestAuth(testAuth: TestAuthInstance) {
+  const authModule = await import('../../lib/auth');
+  if (authModule?.auth) {
+    authModule.auth.api = testAuth.api;
+  }
+}
+
 export type TestAuthInstance = Awaited<ReturnType<typeof createTestAuth>>;

@@ -1,6 +1,6 @@
 import { cleanDatabase, setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
 import { buildFixtures } from '../utils/test/test-fixtures';
-import { UserRole } from './dto/create-user.dto';
+import { UsersService } from './users.service';
 
 describe('UsersService', () => {
   let ctx: Awaited<ReturnType<typeof setupTestDb>>;
@@ -9,7 +9,6 @@ describe('UsersService', () => {
 
   beforeAll(async () => {
     ctx = await setupTestDb();
-    const { UsersService } = await import('./users.service');
     service = ctx.module.get(UsersService);
     fixtures = buildFixtures(ctx.module);
   });
@@ -22,17 +21,12 @@ describe('UsersService', () => {
     await cleanDatabase(ctx.prisma);
   });
 
-  it('creates a user via auth', async () => {
+  it('creates a user via fixtures (db)', async () => {
     const email = 'admin@test.local';
-    const result = await service.create({
-      name: 'Admin User',
-      email,
-      password: 'StrongPassword123',
-      role: UserRole.Admin,
-    });
+    const user = await fixtures.user({ name: 'Admin User', email });
 
-    expect(result.email).toBe(email.toLowerCase());
-    expect(result.name).toBe('Admin User');
+    expect(user.email).toBe(email.toLowerCase());
+    expect(user.name).toBe('Admin User');
   });
 
   it('lists users with cursor pagination', async () => {

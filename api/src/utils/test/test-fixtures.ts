@@ -11,7 +11,13 @@ export function buildFixtures(module: TestingModule) {
   const prisma = module.get<PrismaService>(PrismaService);
   const usersService = module.get<UsersService>(UsersService, { strict: false });
   const coursesService = module.get<CoursesService>(CoursesService, { strict: false });
-  const gradesService = module.get<GradesService>(GradesService, { strict: false });
+  let gradesService: GradesService | undefined;
+  try {
+    gradesService = module.get<GradesService>(GradesService, { strict: false });
+  } catch {
+    gradesService = undefined;
+  }
+
   const attendancesService = module.get<AttendancesService>(AttendancesService, {
     strict: false,
   });

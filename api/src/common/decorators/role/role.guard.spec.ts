@@ -5,15 +5,18 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Role } from '../../generated/prisma/client';
+import { Role } from 'src/generated/prisma/client';
 import { ROLES_KEY } from './role.decorator';
-import { auth as authType } from '../../../lib/auth';
-import { RoleGuard as RoleGuardType } from './role.guard';
+import { RoleGuard } from './role.guard';
+import {
+  createTestAuth,
+  installTestAuth,
+  type TestAuthInstance,
+} from '../../../utils/test/auth-helper';
 import { setupTestDb, teardownTestDb } from '../../../utils/test/setup-tests';
 
-let auth: typeof authType;
-let RoleGuard: typeof RoleGuardType;
 let ctx: Awaited<ReturnType<typeof setupTestDb>>;
+let testAuth: TestAuthInstance;
 
 const getSetCookies = (headers: Headers) => {
   const typed = headers as Headers & { getSetCookie?: () => string[] };
@@ -35,7 +38,7 @@ const createSessionCookie = async (role: Role) => {
   const email = `role-${role.toLowerCase()}-${Date.now()}@test.local`;
   const password = 'StrongPassword123';
 
-  await auth.api.createUser({
+  await testAuth.api.createUser({
     body: {
       email,
       password,
@@ -44,7 +47,7 @@ const createSessionCookie = async (role: Role) => {
     },
   });
 
-  const signIn = await auth.api.signInEmail({
+  const signIn = await testAuth.api.signInEmail({
     body: { email, password, rememberMe: false },
     returnHeaders: true,
   });
@@ -85,8 +88,8 @@ const createContext = (
 
 beforeAll(async () => {
   ctx = await setupTestDb();
-  ({ auth } = await import('../../lib/auth'));
-  ({ RoleGuard } = await import('./role.guard'));
+  testAuth = await createTestAuth(ctx.prisma);
+  await installTestAuth(testAuth);
 });
 
 afterAll(async () => {

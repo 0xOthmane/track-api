@@ -1,61 +1,35 @@
-import { setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
-import { createTestAuth } from '../utils/test/auth-helper';
-
-let ctx: Awaited<ReturnType<typeof setupTestDb>> | null = null;
-
-beforeAll(async () => {
-  ctx = await setupTestDb();
-  await createTestAuth(ctx.prisma);
-  // require auth module after DB is ready so it initializes against test DB
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require('../lib/auth');
-});
-
-afterAll(async () => {
-  if (ctx) await teardownTestDb(ctx);
-});
-
-jest.mock('./admin-stats-cache', () => ({
-  getCachedAdminStats: jest.fn(),
-  setCachedAdminStats: jest.fn(),
-  clearCachedAdminStats: jest.fn(),
-}));
-
-import { Test, TestingModule } from '@nestjs/testing';
 import type { Response } from 'express';
 import { AdminController } from './admin.controller';
-import { AdminService } from './admin.service';
+import { AdminModule } from './admin.module';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  cleanDatabase,
+  setupTestDbWithRedis,
+  teardownTestDb,
+} from '../utils/test/setup-tests';
 
 describe('AdminController', () => {
+  let ctx: Awaited<ReturnType<typeof setupTestDbWithRedis>> | null = null;
   let controller: AdminController;
-  let getSemesterReportCsv: jest.Mock;
-  let adminService: {
-    getSemesterReportCsv: jest.Mock;
-    importEnrollments: jest.Mock;
-    getStats: jest.Mock;
-    sendSemesterSummary: jest.Mock;
-  };
+  let prisma: PrismaService;
+
+  const uniqueEmail = () =>
+    `admin-${Date.now()}-${Math.floor(Math.random() * 100000)}@test.local`;
+
+  beforeAll(async () => {
+    ctx = await setupTestDbWithRedis([AdminModule]);
+    controller = ctx.module.get(AdminController);
+    prisma = ctx.module.get(PrismaService);
+  });
 
   beforeEach(async () => {
-    getSemesterReportCsv = jest.fn();
-    adminService = {
-      getSemesterReportCsv,
-      importEnrollments: jest.fn(),
-      getStats: jest.fn(),
-      sendSemesterSummary: jest.fn(),
-    };
+    if (ctx) {
+      await cleanDatabase(ctx.prisma);
+    }
+  });
 
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AdminController],
-      providers: [
-        {
-          provide: AdminService,
-          useValue: adminService,
-        },
-      ],
-    }).compile();
-
-    controller = module.get<AdminController>(AdminController);
+  afterAll(async () => {
+    if (ctx) await teardownTestDb(ctx);
   });
 
   it('should be defined', () => {
@@ -63,74 +37,86 @@ describe('AdminController', () => {
   });
 
   it('streams semester csv with csv headers', async () => {
-    adminService.getSemesterReportCsv.mockResolvedValue('Student name\n');
-    const setHeader = jest.fn();
-    const send = jest.fn();
+    const headers = new Map<string, string>();
+    let body = '';
     const res = {
-      setHeader,
-      send,
+      setHeader: (key: string, value: string) => {
+        headers.set(key, value);
+      },
+      send: (value: string) => {
+        body = value;
+      },
     } as unknown as Response;
 
     await controller.getSemesterReport('Fall 2024', res);
 
-    expect(getSemesterReportCsv.mock.calls).toEqual([['Fall 2024']]);
-    expect(setHeader.mock.calls).toEqual([
-      ['Content-Type', 'text/csv'],
-      ['Content-Disposition', 'attachment; filename="semester-Fall 2024.csv"'],
-    ]);
-    expect(send.mock.calls).toEqual([['Student name\n']]);
+    expect(headers.get('Content-Type')).toBe('text/csv');
+    expect(headers.get('Content-Disposition')).toBe(
+      'attachment; filename="semester-Fall 2024.csv"',
+    );
+    expect(body).toContain('Student name');
   });
 
   it('returns enrollment import results', async () => {
-    adminService.importEnrollments.mockResolvedValue({
-      enrolled: 1,
-      skipped: [],
+    const teacher = await prisma.user.create({
+      data: { name: 'Teacher', email: uniqueEmail(), role: 'TEACHER' },
+    });
+    const student = await prisma.user.create({
+      data: { name: 'Student', email: uniqueEmail(), role: 'STUDENT' },
+    });
+    const course = await prisma.course.create({
+      data: {
+        name: 'Test Course',
+        description: 'Admin import course',
+        capacity: 2,
+        semester: 'Fall 2024',
+        teacherId: teacher.id,
+      },
     });
 
-    await expect(
-      controller.importEnrollments('studentId,courseId'),
-    ).resolves.toEqual({ enrolled: 1, skipped: [] });
+    const csv = `studentId,courseId\n${student.id},${course.id}`;
+    const result = await controller.importEnrollments(csv);
+
+    expect(result.enrolled).toBe(1);
+    expect(result.skipped).toEqual([]);
   });
 
   it('returns semester stats', async () => {
-    adminService.getStats.mockResolvedValue({
-      semester: 'Fall 2024',
-      totalStudents: 2,
-      totalCourses: 1,
-      averageGradePerCourse: [],
-      globalAtRiskCount: 0,
+    const teacher = await prisma.user.create({
+      data: { name: 'Teacher', email: uniqueEmail(), role: 'TEACHER' },
+    });
+    const student = await prisma.user.create({
+      data: { name: 'Student', email: uniqueEmail(), role: 'STUDENT' },
+    });
+    const course = await prisma.course.create({
+      data: {
+        name: 'Stats Course',
+        description: 'Admin stats course',
+        capacity: 3,
+        semester: 'Fall 2024',
+        teacherId: teacher.id,
+      },
     });
 
-    await expect(
-      controller.getStats({ semester: 'Fall 2024' }),
-    ).resolves.toMatchObject({ semester: 'Fall 2024' });
+    await prisma.enrollment.create({
+      data: {
+        studentId: student.id,
+        courseId: course.id,
+      },
+    });
+
+    const stats = await controller.getStats({ semester: 'Fall 2024' });
+
+    expect(stats.totalCourses).toBe(1);
+    expect(stats.totalStudents).toBe(1);
+    expect(stats.semester).toBe('Fall 2024');
   });
 
   it('triggers the semester summary flow', async () => {
-    adminService.sendSemesterSummary.mockResolvedValue({
-      semester: 'Fall 2024',
-      sent: true,
-      message: 'Simulated summary email logged successfully',
-      stats: {
-        semester: 'Fall 2024',
-        totalStudents: 2,
-        totalCourses: 1,
-        averageGradePerCourse: [],
-        globalAtRiskCount: 0,
-      },
-    });
+    const summary = await controller.sendSemesterSummary('Fall 2024');
 
-    await expect(controller.sendSemesterSummary('Fall 2024')).resolves.toEqual({
-      semester: 'Fall 2024',
-      sent: true,
-      message: 'Simulated summary email logged successfully',
-      stats: {
-        semester: 'Fall 2024',
-        totalStudents: 2,
-        totalCourses: 1,
-        averageGradePerCourse: [],
-        globalAtRiskCount: 0,
-      },
-    });
+    expect(summary.sent).toBe(true);
+    expect(summary.semester).toBe('Fall 2024');
+    expect(summary.stats).toBeDefined();
   });
 });

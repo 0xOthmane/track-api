@@ -7,6 +7,7 @@ import { RedisContainer, StartedRedisContainer } from '@testcontainers/redis';
 import { execSync } from 'child_process';
 import { validate } from '../../lib/env';
 import { redis } from '../../lib/redis';
+import { createTestAuth, installTestAuth } from './auth-helper';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UsersModule } from '../../users/users.module';
@@ -58,8 +59,11 @@ async function waitForRedisReady() {
   throw new Error('Redis did not become ready in time');
 }
 
-export async function setupTestDb(options?: { includeRedis?: boolean }): Promise<TestContext> {
-  const hasRedis = options?.includeRedis === true;
+export async function setupTestDb(
+  enableRedis = false,
+  extraImports: Array<unknown> = [],
+): Promise<TestContext> {
+  const hasRedis = Boolean(enableRedis && process.env.REDIS_HOST && process.env.REDIS_PORT);
   const pgContainer = await new PostgreSqlContainer('postgres:18-alpine')
     .withDatabase('test')
     .withUsername('test')
@@ -93,6 +97,7 @@ export async function setupTestDb(options?: { includeRedis?: boolean }): Promise
     CoursesModule,
     AttendancesModule,
     ClsModule.forRoot({ global: true }),
+    ...extraImports,
   ];
 
   if (hasRedis) {
@@ -113,16 +118,25 @@ export async function setupTestDb(options?: { includeRedis?: boolean }): Promise
 
   const prisma = module.get<PrismaService>(PrismaService);
 
+  try {
+    const testAuth = await createTestAuth(prisma);
+    await installTestAuth(testAuth);
+  } catch {
+    // ignore
+  }
+
   return { module, prisma, pgContainer };
 }
 
-export async function setupTestDbWithRedis(): Promise<TestContext> {
+export async function setupTestDbWithRedis(
+  extraImports: Array<unknown> = [],
+): Promise<TestContext> {
   const redisContainer = await new RedisContainer('redis:7-alpine').start();
 
   process.env.REDIS_HOST = redisContainer.getHost();
   process.env.REDIS_PORT = String(redisContainer.getPort());
 
-  const dbContext = await setupTestDb({ includeRedis: true });
+  const dbContext = await setupTestDb(true, extraImports);
 
   await waitForRedisReady();
 

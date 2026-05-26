@@ -10,7 +10,7 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
 });
 
-export const auth = betterAuth({
+const _authInstance = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
@@ -75,3 +75,8 @@ export const auth = betterAuth({
   },
   plugins: [admin(), openAPI()],
 });
+
+// Export an object so tests can mutate `auth.api` when needed.
+export const auth = {
+  api: _authInstance.api,
+};

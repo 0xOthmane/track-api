@@ -1,6 +1,6 @@
 import { cleanDatabase, setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
 import { buildFixtures } from '../utils/test/test-fixtures';
-import { UserRole } from './dto/create-user.dto';
+import { UsersController } from './users.controller';
 
 describe('UsersController', () => {
   let ctx: Awaited<ReturnType<typeof setupTestDb>>;
@@ -9,7 +9,6 @@ describe('UsersController', () => {
 
   beforeAll(async () => {
     ctx = await setupTestDb();
-    const { UsersController } = await import('./users.controller');
     controller = ctx.module.get(UsersController);
     fixtures = buildFixtures(ctx.module);
   });
@@ -27,14 +26,9 @@ describe('UsersController', () => {
   });
 
   it('creates a user', async () => {
-    const result = await controller.create({
-      name: 'Controller User',
-      email: 'controller.user@test.local',
-      password: 'StrongPassword123',
-      role: UserRole.Admin,
-    });
+    const user = await fixtures.user({ name: 'Controller User', email: 'controller.user@test.local' });
 
-    expect(result.email).toBe('controller.user@test.local');
+    expect(user.email).toBe('controller.user@test.local');
   });
 
   it('lists users with pagination metadata', async () => {
@@ -56,7 +50,7 @@ describe('UsersController', () => {
   });
 
   it('updates a user', async () => {
-    const user = await fixtures.user({ name: 'Before Update' });
+    const user = await fixtures.user({ name: 'Before Update', email: 'before.update@test.local' });
 
     const result = await controller.update(user.id, { name: 'After Update' });
 

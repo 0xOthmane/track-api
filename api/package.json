@@ -99,12 +99,12 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "collectCoverageFrom": [
-      "src/**/*.service.ts",
-      "src/**/*.controller.ts",
-      "src/**/pipes/**/*.ts",
-      "src/**/middleware/**/*.ts",
-      "src/**/decorators/**/*.ts",
-      "src/**/guards/**/*.ts"
+      "**/*.service.ts",
+      "**/*.controller.ts",
+      "**/pipes/**/*.ts",
+      "**/middleware/**/*.ts",
+      "**/decorators/**/*.ts",
+      "**/guards/**/*.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
