@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import env from '../config/env.config';
+import { getEnv } from '../config/env.config';
 
 export interface RedisClient {
   ping(): Promise<string>;
@@ -24,10 +24,11 @@ let redisClient: Redis | null = null;
 
 function createRedisClient(): Redis {
   if (!redisClient) {
-    const host = process.env.REDIS_HOST ?? env.REDIS_HOST;
+    const envConfig = getEnv();
+    const host = process.env.REDIS_HOST ?? envConfig.REDIS_HOST;
     const port = process.env.REDIS_PORT
       ? Number(process.env.REDIS_PORT)
-      : env.REDIS_PORT;
+      : envConfig.REDIS_PORT;
 
     const isTest = process.env.NODE_ENV === 'test';
 

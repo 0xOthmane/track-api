@@ -1,3 +1,6 @@
+import { DynamicModule, ForwardReference } from "@nestjs/common";
+import { Type } from "@nestjs/common/interfaces/type.interface";
+
 export type AuthUser = {
   id: string;
   createdAt: Date;
@@ -28,3 +31,9 @@ export interface UserRequest extends Request {
   user: AuthUser;
   session?: AuthSession;
 }
+
+export type ModuleImport =
+  | Type<any>
+  | DynamicModule
+  | Promise<DynamicModule>
+  | ForwardReference<any>;

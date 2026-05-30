@@ -265,6 +265,13 @@ export class AdminService {
     };
   }
 
+  /**
+   * Build the full set of report rows for a semester. Each row corresponds
+   * to a student-course pairing with computed metrics (weighted average,
+   * attendance rate, and at-risk flag).
+   * @param semester - semester identifier
+   * @returns Array of report rows used for CSV export and statistics
+   */
   private async getSemesterReportRows(semester: string) {
     const courses = await this.prisma.course.findMany({
       where: { semester },
@@ -362,6 +369,14 @@ export class AdminService {
     });
   }
 
+  /**
+   * Calculate a weighted average for a student's grades using the
+   * provided evaluation weights. Returns `null` when no grades or weights
+   * are available.
+   * @param grades - array of grades with `evaluationType` and `value`
+   * @param weights - array of weights with `type` and `weight`
+   * @returns weighted average value or `null`
+   */
   private calculateWeightedAverage(
     grades: Array<{ evaluationType: string; value: number }>,
     weights: Array<{ type: string; weight: number }>,
@@ -405,6 +420,11 @@ export class AdminService {
     return weightedTotal / totalWeight;
   }
 
+  /**
+   * Parse the enrollment CSV content into normalized records.
+   * @param csv - CSV content string
+   * @returns Array of objects with `studentId` and `courseId` as strings
+   */
   private parseEnrollmentCsv(csv: string) {
     const records: Array<{
       studentId?: string | number | boolean | null;
@@ -422,6 +442,11 @@ export class AdminService {
     }));
   }
 
+  /**
+   * Escape a string value for inclusion in a CSV cell.
+   * @param value - raw cell value
+   * @returns escaped CSV-safe string
+   */
   private escapeCsvValue(value: string) {
     if (!/[",\n]/.test(value)) {
       return value;
@@ -430,6 +455,11 @@ export class AdminService {
     return `"${value.replace(/"/g, '""')}"`;
   }
 
+  /**
+   * Build a human-readable semester summary string from computed stats.
+   * @param stats - computed admin stats DTO
+   * @returns multiline string suitable for email bodies or logs
+   */
   private buildSemesterSummary(stats: AdminStatsResponseDto) {
     const courseAverages = stats.averageGradePerCourse
       .map((course) => `${course.courseName}: ${course.average ?? 'n/a'}`)

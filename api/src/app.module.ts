@@ -19,7 +19,7 @@ import { UsersModule } from './users/users.module';
 import { BullModule } from '@nestjs/bullmq';
 import { CoursesModule } from './courses/courses.module';
 import { GradesModule } from './grades/grades.module';
-import { env } from './config/env.config';
+import { getEnv } from './config/env.config';
 import { AttendancesModule } from './attendances/attendances.module';
 import { AdminModule } from './admin/admin.module';
 import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
@@ -48,8 +48,8 @@ import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
     UsersModule,
     BullModule.forRoot({
       connection: {
-        host: env.REDIS_HOST,
-        port: env.REDIS_PORT,
+        host: getEnv().REDIS_HOST,
+        port: getEnv().REDIS_PORT,
       },
     }),
     CoursesModule,

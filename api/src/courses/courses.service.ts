@@ -362,6 +362,11 @@ export class CoursesService {
     });
   }
 
+  /**
+   * Ensure a course with the given id exists. Throws `NotFoundException`
+   * when the course is missing.
+   * @param courseId - Course identifier
+   */
   private async ensureCourseExists(courseId: string) {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
@@ -372,7 +377,11 @@ export class CoursesService {
       throw new NotFoundException('Course not found');
     }
   }
-
+  /**
+   * Compute the total of all evaluation weights for a course.
+   * @param courseId - Course identifier
+   * @returns numeric sum of weights (0 if none)
+   */
   private async getWeightsTotal(courseId: string) {
     const total = await this.prisma.evaluationWeight.aggregate({
       where: { courseId },

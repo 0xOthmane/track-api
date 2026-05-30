@@ -24,7 +24,10 @@ import { UpdateGradeDto } from './dto/update-grade.dto';
 import { GradesService } from './grades.service';
 import { CurrentUser } from '../common/decorators/current-user/current-user.decorator';
 import { type User } from '../generated/prisma/client';
-import { type CursorPaginationQuery } from '../common/pipes/cursor/cursor.pipe';
+import {
+  type CursorPaginationQuery,
+  CursorPipe,
+} from '../common/pipes/cursor/cursor.pipe';
 import { ImportGradesDto } from './dto/import-grades.dto';
 import { ImportGradesRequestDto } from './dto/import-grades-request.dto';
 
@@ -36,20 +39,26 @@ export class GradesController {
 
   @Post()
   @Role('TEACHER')
-  @Owner({ model: 'course', field: 'courseId' })
+  @Owner({ model: 'course', field: 'teacherId', param: 'courseId', source: 'body' })
   create(@Body() createGradeDto: CreateGradeDto, @CurrentUser() user: User) {
     return this.gradesService.create(createGradeDto, user);
   }
 
   @Get()
   @Role('TEACHER', 'ADMIN')
-  findAll(@Query() params: CursorPaginationQuery, @CurrentUser() user: User) {
+  findAll(
+    @Query(CursorPipe) params: CursorPaginationQuery,
+    @CurrentUser() user: User,
+  ) {
     return this.gradesService.findAll(params, user);
   }
 
   @Get('me')
   @Role('STUDENT')
-  findMine(@Query() params: CursorPaginationQuery, @CurrentUser() user: User) {
+  findMine(
+    @Query(CursorPipe) params: CursorPaginationQuery,
+    @CurrentUser() user: User,
+  ) {
     return this.gradesService.findMine(params, user);
   }
 
@@ -58,7 +67,7 @@ export class GradesController {
   @Owner({ model: 'course', field: 'teacherId' })
   findByCourse(
     @Param('id') id: string,
-    @Query() params: CursorPaginationQuery,
+    @Query(CursorPipe) params: CursorPaginationQuery,
   ) {
     return this.gradesService.findByCourse(id, params);
   }

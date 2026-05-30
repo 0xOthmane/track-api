@@ -16,6 +16,7 @@ import { GradesModule } from '../../grades/grades.module';
 import { AttendancesModule } from '../../attendances/attendances.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ClsModule } from 'nestjs-cls';
+import { ModuleImport } from '../../types';
 
 jest.setTimeout(60000);
 
@@ -61,7 +62,7 @@ async function waitForRedisReady() {
 
 export async function setupTestDb(
   enableRedis = false,
-  extraImports: Array<unknown> = [],
+  extraImports: ModuleImport[] = [],
 ): Promise<TestContext> {
   const hasRedis = Boolean(enableRedis && process.env.REDIS_HOST && process.env.REDIS_PORT);
   const pgContainer = await new PostgreSqlContainer('postgres:18-alpine')
@@ -91,7 +92,7 @@ export async function setupTestDb(
     stdio: 'pipe',
   });
 
-  const imports = [
+  const imports: ModuleImport[] = [
     PrismaModule,
     UsersModule,
     CoursesModule,
@@ -129,7 +130,7 @@ export async function setupTestDb(
 }
 
 export async function setupTestDbWithRedis(
-  extraImports: Array<unknown> = [],
+  extraImports: ModuleImport[] = [],
 ): Promise<TestContext> {
   const redisContainer = await new RedisContainer('redis:7-alpine').start();
 

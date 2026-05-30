@@ -26,19 +26,18 @@ type AttendanceMetrics = {
   absenceRate: number;
   atRisk: boolean;
 };
-
+/**
+ * AttendancesService
+ *
+ * Manages attendance sessions and records for courses. Notifies teachers
+ * when students become at-risk based on absence thresholds.
+ */
 @Injectable()
 export class AttendancesService {
   constructor(
     private prisma: PrismaService,
     private attendanceGateway: AttendanceGateway,
   ) {}
-  /**
-   * AttendancesService
-   *
-   * Manages attendance sessions and records for courses. Notifies teachers
-   * when students become at-risk based on absence thresholds.
-   */
   /**
    * Create an attendance session for a course.
    * @param courseId - Course identifier
@@ -218,6 +217,12 @@ export class AttendancesService {
     totalCount: number,
     presentCount: number,
   ): AttendanceMetrics {
+    /**
+     * Compute attendance metrics from counts.
+     * @param totalCount - total number of sessions considered
+     * @param presentCount - number of sessions the student was present
+     * @returns computed AttendanceMetrics including rates and atRisk flag
+     */
     const safeTotalCount = Math.max(totalCount, 0);
     const safePresentCount = Math.max(presentCount, 0);
     const absentCount = Math.max(safeTotalCount - safePresentCount, 0);
@@ -242,6 +247,16 @@ export class AttendancesService {
     excludeSessionId?: string,
     totalCount?: number,
   ): Promise<AttendanceMetrics> {
+    /**
+     * Gather attendance metrics for a student in a course, optionally
+     * excluding a specific session and reusing a provided total count.
+     * @param prisma - Prisma-like subset used for transactions
+     * @param courseId - Course identifier
+     * @param studentId - Student identifier
+     * @param excludeSessionId - optional session id to exclude from counts
+     * @param totalCount - optional precomputed total session count
+     * @returns AttendanceMetrics for the student
+     */
     const resolvedTotalCount =
       totalCount ??
       (await prisma.attendanceSession.count({

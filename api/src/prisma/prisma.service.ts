@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
-import { env } from '../config/env.config';
+import { getEnv } from '../config/env.config';
 
 /**
  * PrismaService
@@ -20,7 +20,7 @@ export class PrismaService
   private readonly databaseUrl: string;
 
   constructor() {
-    const databaseUrl = process.env.DATABASE_URL ?? env.DATABASE_URL;
+    const databaseUrl = process.env.DATABASE_URL ?? getEnv().DATABASE_URL;
 
     super({
       adapter: new PrismaPg({
@@ -31,6 +31,10 @@ export class PrismaService
     this.databaseUrl = databaseUrl;
   }
 
+  /**
+   * Lifecycle hook called when the NestJS module initializes. Connects
+   * the Prisma client to the database if a connection string is present.
+   */
   async onModuleInit() {
     if (!this.databaseUrl) {
       return;
@@ -39,6 +43,10 @@ export class PrismaService
     await this.$connect();
   }
 
+  /**
+   * Lifecycle hook called when the NestJS module is destroyed. Ensures the
+   * Prisma client disconnects cleanly from the database.
+   */
   async onModuleDestroy() {
     await this.$disconnect();
   }

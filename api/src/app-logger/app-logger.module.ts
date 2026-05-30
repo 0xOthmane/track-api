@@ -1,23 +1,22 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { AppLoggerService } from './app-logger.service';
-import { env } from '../config/env.config';
+import { getEnv } from '../config/env.config';
 
 @Module({
   imports: [
     LoggerModule.forRoot({
       pinoHttp: {
-        transport:
-          env.NODE_ENV !== 'production'
-            ? {
+        transport: getEnv().NODE_ENV !== 'production'
+          ? {
                 target: 'pino-pretty',
                 options: {
                   colorize: true,
                   singleLine: true,
                 },
               }
-            : undefined,
-        level: env.LOG_LEVEL,
+          : undefined,
+        level: getEnv().LOG_LEVEL,
         redact: [
           'req.headers.authorization',
           'req.headers.cookie',

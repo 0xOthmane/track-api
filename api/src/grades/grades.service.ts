@@ -10,7 +10,6 @@ import {
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ClsService } from 'nestjs-cls';
-import { type Express } from 'express';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { UpdateGradeDto } from './dto/update-grade.dto';
 import { PrismaService } from '../prisma/prisma.service';
