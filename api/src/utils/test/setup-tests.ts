@@ -1,13 +1,22 @@
-import { execSync } from 'child_process';
+import { Test, TestingModule } from '@nestjs/testing';
 import {
   PostgreSqlContainer,
   StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
-import { TestingModule, Test } from '@nestjs/testing';
-import { PrismaService } from '../../prisma/prisma.service';
-import { PrismaModule } from '../../prisma/prisma.module';
+import { RedisContainer, StartedRedisContainer } from '@testcontainers/redis';
+import { execSync } from 'child_process';
 import { validate } from '../../lib/env';
-// import { UsersModule } from '../../users/users.module';
+import { redis } from '../../lib/redis';
+import { createTestAuth, installTestAuth } from './auth-helper';
+import { PrismaModule } from '../../prisma/prisma.module';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UsersModule } from '../../users/users.module';
+import { CoursesModule } from '../../courses/courses.module';
+import { GradesModule } from '../../grades/grades.module';
+import { AttendancesModule } from '../../attendances/attendances.module';
+import { BullModule } from '@nestjs/bullmq';
+import { ClsModule } from 'nestjs-cls';
+import { ModuleImport } from '../../types';
 
 jest.setTimeout(60000);
 
@@ -27,17 +36,42 @@ jest.setTimeout(60000);
 export interface TestContext {
   module: TestingModule;
   prisma: PrismaService;
-  container: StartedPostgreSqlContainer;
+  pgContainer: StartedPostgreSqlContainer;
+  redisContainer?: StartedRedisContainer;
 }
 
-export async function setupTestDb(): Promise<TestContext> {
-  const container = await new PostgreSqlContainer('postgres:18-alpine')
+const REDIS_READY_RETRIES = 10;
+const REDIS_READY_DELAY_MS = 250;
+
+async function waitForRedisReady() {
+  for (let attempt = 0; attempt < REDIS_READY_RETRIES; attempt += 1) {
+    try {
+      const pong = await redis.ping();
+      if (pong === 'PONG') {
+        return;
+      }
+    } catch {
+      // ignore and retry
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, REDIS_READY_DELAY_MS));
+  }
+
+  throw new Error('Redis did not become ready in time');
+}
+
+export async function setupTestDb(
+  enableRedis = false,
+  extraImports: ModuleImport[] = [],
+): Promise<TestContext> {
+  const hasRedis = Boolean(enableRedis && process.env.REDIS_HOST && process.env.REDIS_PORT);
+  const pgContainer = await new PostgreSqlContainer('postgres:18-alpine')
     .withDatabase('test')
     .withUsername('test')
     .withPassword('test')
     .start();
 
-  const url = container.getConnectionUri();
+  const url = pgContainer.getConnectionUri();
 
   // Set DATABASE_URL before the NestJS module boots so PrismaService picks it up
   process.env.DATABASE_URL = url;
@@ -58,16 +92,70 @@ export async function setupTestDb(): Promise<TestContext> {
     stdio: 'pipe',
   });
 
+  const imports: ModuleImport[] = [
+    PrismaModule,
+    UsersModule,
+    CoursesModule,
+    AttendancesModule,
+    ClsModule.forRoot({ global: true }),
+    ...extraImports,
+  ];
+
+  if (hasRedis) {
+    imports.push(
+      BullModule.forRoot({
+        connection: {
+          host: process.env.REDIS_HOST,
+          port: Number(process.env.REDIS_PORT),
+        },
+      }),
+      GradesModule,
+    );
+  }
+
   const module = await Test.createTestingModule({
-    imports: [
-      PrismaModule,
-      // UsersModule
-    ],
+    imports,
   }).compile();
 
   const prisma = module.get<PrismaService>(PrismaService);
 
-  return { module, prisma, container };
+  try {
+    const testAuth = await createTestAuth(prisma);
+    await installTestAuth(testAuth);
+  } catch {
+    // ignore
+  }
+
+  return { module, prisma, pgContainer };
+}
+
+export async function setupTestDbWithRedis(
+  extraImports: ModuleImport[] = [],
+): Promise<TestContext> {
+  const redisContainer = await new RedisContainer('redis:7-alpine').start();
+
+  process.env.REDIS_HOST = redisContainer.getHost();
+  process.env.REDIS_PORT = String(redisContainer.getPort());
+
+  const dbContext = await setupTestDb(true, extraImports);
+
+  await waitForRedisReady();
+
+  return {
+    ...dbContext,
+    redisContainer,
+  };
+}
+
+export async function setupRedisTestContainer(): Promise<StartedRedisContainer> {
+  const redisContainer = await new RedisContainer('redis:7-alpine').start();
+
+  process.env.REDIS_HOST = redisContainer.getHost();
+  process.env.REDIS_PORT = String(redisContainer.getPort());
+
+  await waitForRedisReady();
+
+  return redisContainer;
 }
 
 export async function teardownTestDb(ctx: TestContext): Promise<void> {
@@ -75,7 +163,10 @@ export async function teardownTestDb(ctx: TestContext): Promise<void> {
     return;
   }
   await ctx.module.close();
-  await ctx.container.stop();
+  if (ctx.redisContainer) {
+    await ctx.redisContainer.stop();
+  }
+  await ctx.pgContainer.stop();
 }
 
 /**
@@ -83,5 +174,16 @@ export async function teardownTestDb(ctx: TestContext): Promise<void> {
  * Order matters — respect FK constraints.
  */
 export async function cleanDatabase(prisma: PrismaService): Promise<void> {
-  await prisma.$transaction([prisma.user.deleteMany()]);
+  // Delete in order that respects foreign key constraints.
+  await prisma.$transaction([
+    prisma.enrollment.deleteMany(),
+    prisma.grade.deleteMany(),
+    prisma.attendanceRecord.deleteMany(),
+    prisma.attendanceSession.deleteMany(),
+    prisma.evaluationWeight.deleteMany(),
+    prisma.course.deleteMany(),
+    prisma.session.deleteMany(),
+    prisma.account.deleteMany(),
+    prisma.user.deleteMany(),
+  ]);
 }

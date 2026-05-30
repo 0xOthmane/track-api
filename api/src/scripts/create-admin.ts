@@ -1,10 +1,10 @@
 import { auth } from '../lib/auth';
 import { PrismaClient } from '../generated/prisma/client';
-import { env } from '../config/env.config';
+import { getEnv } from '../config/env.config';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
+  adapter: new PrismaPg({ connectionString: getEnv().DATABASE_URL }),
 });
 
 function requireArg(value: string | undefined, label: string): string {

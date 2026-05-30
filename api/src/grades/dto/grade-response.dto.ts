@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PaginationMetaDto } from '../../common/dtos/pagination-meta.dto';
 import { Expose, Transform } from 'class-transformer';
-import { Course, User } from '../../generated/prisma/client';
+import { Course, User, Grade } from '../../generated/prisma/client';
 
 export class GradeResponseDto {
   @ApiProperty({ example: 'clp7x1f0a0000xv7t7v9a9c6b' })
@@ -18,12 +18,12 @@ export class GradeResponseDto {
 
   @ApiProperty({ example: 'Math 101' })
   @Expose()
-  @Transform(({ obj }: { obj: Course }) => obj.name)
+  @Transform(({ obj }: { obj: Grade & { course?: Course } }) => obj.course?.name)
   readonly courseName!: string;
 
   @ApiProperty({ example: 'John Doe' })
   @Expose()
-  @Transform(({ obj }: { obj: User }) => obj.name)
+  @Transform(({ obj }: { obj: Grade & { student?: User } }) => obj.student?.name)
   readonly studentName!: string;
 }
 

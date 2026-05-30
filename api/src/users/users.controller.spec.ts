@@ -1,20 +1,67 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { cleanDatabase, setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
+import { buildFixtures } from '../utils/test/test-fixtures';
 import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
 
 describe('UsersController', () => {
-  let controller: UsersController;
+  let ctx: Awaited<ReturnType<typeof setupTestDb>>;
+  let controller: import('./users.controller').UsersController;
+  let fixtures: ReturnType<typeof buildFixtures>;
+
+  beforeAll(async () => {
+    ctx = await setupTestDb();
+    controller = ctx.module.get(UsersController);
+    fixtures = buildFixtures(ctx.module);
+  });
+
+  afterAll(async () => {
+    if (ctx) await teardownTestDb(ctx);
+  });
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [UsersController],
-      providers: [UsersService],
-    }).compile();
-
-    controller = module.get<UsersController>(UsersController);
+    await cleanDatabase(ctx.prisma);
   });
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('creates a user', async () => {
+    const user = await fixtures.user({ name: 'Controller User', email: 'controller.user@test.local' });
+
+    expect(user.email).toBe('controller.user@test.local');
+  });
+
+  it('lists users with pagination metadata', async () => {
+    await fixtures.user({ name: 'List User 1' });
+    await fixtures.user({ name: 'List User 2' });
+
+    const result = await controller.findAll({ limit: 10 });
+
+    expect(result.data.length).toBeGreaterThanOrEqual(2);
+    expect(result.meta).toHaveProperty('nextCursor');
+  });
+
+  it('gets a user by id', async () => {
+    const user = await fixtures.user({ name: 'Get User' });
+
+    const result = await controller.findOne(user.id);
+
+    expect(result.id).toBe(user.id);
+  });
+
+  it('updates a user', async () => {
+    const user = await fixtures.user({ name: 'Before Update', email: 'before.update@test.local' });
+
+    const result = await controller.update(user.id, { name: 'After Update' });
+
+    expect(result.name).toBe('After Update');
+  });
+
+  it('removes a user', async () => {
+    const user = await fixtures.user({ name: 'Remove User' });
+
+    const result = await controller.remove(user.id);
+
+    expect(result.id).toBe(user.id);
   });
 });

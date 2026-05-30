@@ -25,11 +25,28 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+This repository contains the Track API backend: a NestJS service using Prisma (Postgres) and Redis for rate-limiting and caching. It exposes a Swagger UI at `/api/docs` when running locally.
+
 ## Project setup
 
 ```bash
 $ npm install
 ```
+
+### Environment
+
+Copy or reference `.env` values from `.env.sample` (see below). Key environment variables:
+
+- `NODE_ENV` - `development|test|production` (default: `development`)
+- `PORT` - HTTP port (default: `3000`)
+- `DATABASE_URL` - Postgres connection string (required)
+- `REDIS_HOST` - Redis host (default: `localhost`)
+- `REDIS_PORT` - Redis port (default: `6379`)
+- `LOG_LEVEL` - Logging level (default: `info`)
+
+Create a `.env` in this folder or provide the variables in your environment before running the app.
+
+A safe example file is provided as `.env.sample`.
 
 ## Compile and run the project
 
@@ -42,6 +59,32 @@ $ npm run start:dev
 
 # production mode
 $ npm run start:prod
+```
+
+### Database / Prisma
+
+Before first run, generate the Prisma client and apply migrations:
+
+```bash
+# generate client
+$ npm run prisma:generate
+
+# apply migrations (development)
+$ npm run prisma:migrate
+```
+
+Prisma reads the `DATABASE_URL` environment variable.
+
+### Swagger / API docs
+
+When the server is running the OpenAPI UI is available at:
+
+`http://localhost:<PORT>/api/docs`
+
+### Create admin user
+
+```bash
+$ npm run create:admin -- admin@example.com supersecret "Admin Name"
 ```
 
 ## Run tests

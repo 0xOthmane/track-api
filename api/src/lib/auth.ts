@@ -3,11 +3,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { PrismaClient } from '../generated/prisma/client';
 import { admin, openAPI } from 'better-auth/plugins';
-import { env } from '../config/env.config';
+import { getEnv } from '../config/env.config';
 // import { redis } from './redis';
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
+  adapter: new PrismaPg({ connectionString: getEnv().DATABASE_URL }),
 });
 
 export const auth = betterAuth({
@@ -54,24 +54,26 @@ export const auth = betterAuth({
     '/ok',
     '/error',
   ],
-  rateLimit: {
-    enabled: true,
-    window: 60,
-    limit: 100,
-    customRules: {
-      '/sign-in/email': {
-        window: 60,
-        max: 5,
-      },
-      '/sign-out': {
-        window: 30,
-        max: 20,
-      },
-    },
-    // customStorage: {
-    //   get: async (key) => redis.get(key),
-    //   set: async (key, value) => redis.set(key, value),
-    // },
-  },
+  rateLimit: getEnv().NODE_ENV === 'test'
+    ? { enabled: false }
+    : {
+          enabled: true,
+          window: 60,
+          limit: 100,
+          customRules: {
+            '/sign-in/email': {
+              window: 60,
+              max: 5,
+            },
+            '/sign-out': {
+              window: 30,
+              max: 20,
+            },
+          },
+          // customStorage: {
+          //   get: async (key) => redis.get(key),
+          //   set: async (key, value) => redis.set(key, value),
+          // },
+        },
   plugins: [admin(), openAPI()],
 });

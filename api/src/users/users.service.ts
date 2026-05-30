@@ -2,6 +2,8 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { plainToInstance } from 'class-transformer';
@@ -16,6 +18,16 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * UsersService
+   *
+   * Manages user lifecycle through the external auth provider and Prisma.
+   * Maps responses into `UserResponseDto` for controllers.
+   */
+
+  /**
+   * Create a new user via the external auth API and return a sanitized DTO.
+   */
   async create(createUserDto: CreateUserDto) {
     try {
       const user = await auth.api.createUser({
@@ -38,10 +50,14 @@ export class UsersService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * List users with cursor pagination.
+   */
   async findAll(params: CursorPaginationQuery) {
     const { cursor, limit } = params;
     const users = await this.prisma.user.findMany({
@@ -59,6 +75,9 @@ export class UsersService {
     };
   }
 
+  /**
+   * Retrieve a user by id.
+   */
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -71,6 +90,9 @@ export class UsersService {
     });
   }
 
+  /**
+   * Update user record.
+   */
   async update(id: string, updateUserDto: UpdateUserDto) {
     try {
       const user = await this.prisma.user.update({
@@ -89,10 +111,14 @@ export class UsersService {
           throw new ConflictException('A user with this email already exists');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Delete a user by id.
+   */
   async remove(id: string) {
     try {
       const user = await this.prisma.user.delete({
@@ -107,7 +133,8 @@ export class UsersService {
           throw new NotFoundException('User not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 }

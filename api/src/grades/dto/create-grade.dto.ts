@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsString, Max, Min } from 'class-validator';
 import { EvaluationType } from '../../generated/prisma/enums';
 
 export class CreateGradeDto {
@@ -18,5 +18,7 @@ export class CreateGradeDto {
   readonly studentId!: string;
 
   @ApiProperty({ example: EvaluationType.EXAM, enum: EvaluationType })
+  @IsEnum(EvaluationType)
+  @IsNotEmpty({ message: 'Evaluation type is required' })
   readonly evaluationType!: EvaluationType;
 }

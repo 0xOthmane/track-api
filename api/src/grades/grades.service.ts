@@ -4,11 +4,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ClsService } from 'nestjs-cls';
-import { type Express } from 'express';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { UpdateGradeDto } from './dto/update-grade.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,6 +27,7 @@ import {
   type ImportGradesJobData,
   type ImportGradesResult,
 } from './grades-import.types';
+import { clearCachedAdminStats } from '../admin/admin-stats-cache';
 
 @Injectable()
 export class GradesService {
@@ -35,6 +37,18 @@ export class GradesService {
     @InjectQueue(GRADES_IMPORT_QUEUE)
     private importQueue: Queue<ImportGradesJobData, ImportGradesResult>,
   ) {}
+  /**
+   * GradesService
+   *
+   * Responsible for creating, updating and querying grades. Supports
+   * cursor-based pagination, importing grades via background jobs, and
+   * computing course averages.
+   */
+  /**
+   * Create a grade for a student in a course.
+   * @param createGradeDto - payload with student, course, evaluation type and value
+   * @param user - the creating user (used to set `createdBy`)
+   */
   async create(createGradeDto: CreateGradeDto, user: User) {
     try {
       const grade = await this.prisma.grade.create({
@@ -50,10 +64,11 @@ export class GradesService {
           createdBy: { connect: { id: user.id } },
         },
         include: {
-          course: { select: { name: true } },
+          course: { select: { name: true, semester: true } },
           student: { select: { name: true } },
         },
       });
+      await clearCachedAdminStats(grade.course.semester);
       return plainToInstance(GradeResponseDto, grade, {
         excludeExtraneousValues: true,
       });
@@ -68,10 +83,14 @@ export class GradesService {
           );
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Find grades with cursor pagination. Teachers only see grades they created.
+   */
   async findAll(params: CursorPaginationQuery, user: User) {
     const { cursor, limit } = params;
     const where =
@@ -96,6 +115,9 @@ export class GradesService {
     };
   }
 
+  /**
+   * Find a single grade by id.
+   */
   async findOne(id: string) {
     const grade = await this.prisma.grade.findUnique({
       where: { id },
@@ -112,16 +134,20 @@ export class GradesService {
     });
   }
 
+  /**
+   * Update an existing grade.
+   */
   async update(id: string, updateGradeDto: UpdateGradeDto) {
     try {
       const grade = await this.prisma.grade.update({
         where: { id },
         data: updateGradeDto,
         include: {
-          course: { select: { name: true } },
+          course: { select: { name: true, semester: true } },
           student: { select: { name: true } },
         },
       });
+      await clearCachedAdminStats(grade.course.semester);
       return plainToInstance(GradeResponseDto, grade, {
         excludeExtraneousValues: true,
       });
@@ -131,19 +157,24 @@ export class GradesService {
           throw new NotFoundException('Grade not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Remove a grade by id.
+   */
   async remove(id: string) {
     try {
       const grade = await this.prisma.grade.delete({
         where: { id },
         include: {
-          course: { select: { name: true } },
+          course: { select: { name: true, semester: true } },
           student: { select: { name: true } },
         },
       });
+      await clearCachedAdminStats(grade.course.semester);
       return plainToInstance(GradeResponseDto, grade, {
         excludeExtraneousValues: true,
       });
@@ -153,10 +184,14 @@ export class GradesService {
           throw new NotFoundException('Grade not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Find grades for the authenticated student (cursor pagination).
+   */
   async findMine(params: CursorPaginationQuery, user: User) {
     const { cursor, limit } = params;
     const grades = await this.prisma.grade.findMany({
@@ -179,6 +214,9 @@ export class GradesService {
     };
   }
 
+  /**
+   * Find grades for a given course (cursor pagination).
+   */
   async findByCourse(courseId: string, params: CursorPaginationQuery) {
     const { cursor, limit } = params;
     const grades = await this.prisma.grade.findMany({
@@ -201,6 +239,9 @@ export class GradesService {
     };
   }
 
+  /**
+   * Compute averages for a course grouped by evaluation type and overall.
+   */
   async getCourseAverages(courseId: string) {
     const byType = await this.prisma.grade.groupBy({
       by: ['evaluationType'],
@@ -231,6 +272,9 @@ export class GradesService {
     );
   }
 
+  /**
+   * Enqueue a CSV import job for grades. Returns a job id and status URL.
+   */
   async enqueueImport(
     body: ImportGradesDto,
     file: Express.Multer.File,
@@ -267,6 +311,9 @@ export class GradesService {
     );
   }
 
+  /**
+   * Get status for an import job, enforcing access control for non-admins.
+   */
   async getImportStatus(jobId: string, user: User) {
     const job = await this.importQueue.getJob(jobId);
     if (!job) {

@@ -1,18 +1,67 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { cleanDatabase, setupTestDb, teardownTestDb } from '../utils/test/setup-tests';
+import { buildFixtures } from '../utils/test/test-fixtures';
 import { UsersService } from './users.service';
 
 describe('UsersService', () => {
-  let service: UsersService;
+  let ctx: Awaited<ReturnType<typeof setupTestDb>>;
+  let service: import('./users.service').UsersService;
+  let fixtures: ReturnType<typeof buildFixtures>;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [UsersService],
-    }).compile();
-
-    service = module.get<UsersService>(UsersService);
+  beforeAll(async () => {
+    ctx = await setupTestDb();
+    service = ctx.module.get(UsersService);
+    fixtures = buildFixtures(ctx.module);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  afterAll(async () => {
+    if (ctx) await teardownTestDb(ctx);
+  });
+
+  beforeEach(async () => {
+    await cleanDatabase(ctx.prisma);
+  });
+
+  it('creates a user via fixtures (db)', async () => {
+    const email = 'admin@test.local';
+    const user = await fixtures.user({ name: 'Admin User', email });
+
+    expect(user.email).toBe(email.toLowerCase());
+    expect(user.name).toBe('Admin User');
+  });
+
+  it('lists users with cursor pagination', async () => {
+    await fixtures.user({ name: 'User One' });
+    await fixtures.user({ name: 'User Two' });
+
+    const result = await service.findAll({ limit: 10 });
+
+    expect(result.data.length).toBeGreaterThanOrEqual(2);
+    expect(result.meta).toHaveProperty('nextCursor');
+  });
+
+  it('finds a user by id', async () => {
+    const user = await fixtures.user({ name: 'Lookup User' });
+
+    const result = await service.findOne(user.id);
+
+    expect(result.id).toBe(user.id);
+    expect(result.name).toBe('Lookup User');
+  });
+
+  it('updates a user', async () => {
+    const user = await fixtures.user({ name: 'Before Update' });
+
+    const result = await service.update(user.id, { name: 'After Update' });
+
+    expect(result.name).toBe('After Update');
+  });
+
+  it('removes a user', async () => {
+    const user = await fixtures.user({ name: 'Delete User' });
+
+    const result = await service.remove(user.id);
+
+    expect(result.id).toBe(user.id);
+    await expect(service.findOne(user.id)).rejects.toThrow('User not found');
   });
 });

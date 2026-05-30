@@ -1,29 +1,35 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import {
+  bootstrapE2E,
+  teardownE2E,
+  resetDatabase,
+} from './e2e-helpers';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+describe('App (e2e)', () => {
+  const e2eState: {
+    ctx: Awaited<ReturnType<typeof bootstrapE2E>> | null;
+  } = { ctx: null };
+
+  beforeAll(async () => {
+    e2eState.ctx = await bootstrapE2E();
+  });
 
   beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    if (e2eState.ctx) {
+      await resetDatabase(e2eState.ctx.prisma);
+    }
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  afterAll(async () => {
+    await teardownE2E(e2eState.ctx);
   });
 
-  afterEach(async () => {
-    await app.close();
+  it('GET /health returns ok and correlation id', async () => {
+    const response = await request(e2eState.ctx!.app.getHttpServer())
+      .get('/health')
+      .expect(200);
+
+    expect(response.body).toEqual({ status: 'ok' });
+    expect(response.headers['x-correlation-id']).toBeDefined();
   });
 });

@@ -3,6 +3,8 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,6 +16,7 @@ import {
   type AttendanceAtRiskNotification,
 } from './attendance.gateway';
 import { UpdateAttendanceRecordDto } from './dto/update-attendance-record.dto';
+import { clearCachedAdminStats } from '../admin/admin-stats-cache';
 
 type AttendanceMetrics = {
   totalCount: number;
@@ -23,13 +26,23 @@ type AttendanceMetrics = {
   absenceRate: number;
   atRisk: boolean;
 };
-
+/**
+ * AttendancesService
+ *
+ * Manages attendance sessions and records for courses. Notifies teachers
+ * when students become at-risk based on absence thresholds.
+ */
 @Injectable()
 export class AttendancesService {
   constructor(
     private prisma: PrismaService,
     private attendanceGateway: AttendanceGateway,
   ) {}
+  /**
+   * Create an attendance session for a course.
+   * @param courseId - Course identifier
+   * @param createAttendanceSessionDto - DTO containing the session date and metadata
+   */
   async createSession(
     courseId: string,
     createAttendanceSessionDto: CreateAttendanceSessionDto,
@@ -41,6 +54,13 @@ export class AttendancesService {
           courseId,
         },
       });
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { semester: true },
+      });
+      if (course) {
+        await clearCachedAdminStats(course.semester);
+      }
       return attendance;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
@@ -56,10 +76,18 @@ export class AttendancesService {
         }
       }
       console.error('Error creating attendance session:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Create attendance records for a session. Validates uniqueness per student
+   * and emits notifications for students who become at-risk.
+   * @param courseId - Course identifier
+   * @param sessionId - Attendance session id
+   * @param createAttendanceDtos - Array of attendance records to create
+   */
   async createRecord(
     courseId: string,
     sessionId: string,
@@ -86,6 +114,7 @@ export class AttendancesService {
             course: {
               select: {
                 teacherId: true,
+                semester: true,
               },
             },
           },
@@ -154,12 +183,15 @@ export class AttendancesService {
         return {
           records: createAttendanceDtos,
           notifications,
+          semester: session.course.semester,
         };
       });
 
       for (const notification of result.notifications) {
         this.attendanceGateway.emitAtRisk(notification);
       }
+
+      await clearCachedAdminStats(result.semester);
 
       return result;
     } catch (error) {
@@ -176,7 +208,8 @@ export class AttendancesService {
         }
       }
       console.error('Error creating attendance record:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
@@ -184,6 +217,12 @@ export class AttendancesService {
     totalCount: number,
     presentCount: number,
   ): AttendanceMetrics {
+    /**
+     * Compute attendance metrics from counts.
+     * @param totalCount - total number of sessions considered
+     * @param presentCount - number of sessions the student was present
+     * @returns computed AttendanceMetrics including rates and atRisk flag
+     */
     const safeTotalCount = Math.max(totalCount, 0);
     const safePresentCount = Math.max(presentCount, 0);
     const absentCount = Math.max(safeTotalCount - safePresentCount, 0);
@@ -208,6 +247,16 @@ export class AttendancesService {
     excludeSessionId?: string,
     totalCount?: number,
   ): Promise<AttendanceMetrics> {
+    /**
+     * Gather attendance metrics for a student in a course, optionally
+     * excluding a specific session and reusing a provided total count.
+     * @param prisma - Prisma-like subset used for transactions
+     * @param courseId - Course identifier
+     * @param studentId - Student identifier
+     * @param excludeSessionId - optional session id to exclude from counts
+     * @param totalCount - optional precomputed total session count
+     * @returns AttendanceMetrics for the student
+     */
     const resolvedTotalCount =
       totalCount ??
       (await prisma.attendanceSession.count({
@@ -232,6 +281,10 @@ export class AttendancesService {
     return this.calculateAttendanceMetrics(resolvedTotalCount, presentCount);
   }
 
+  /**
+   * Return simple counts for a session: total, present and absent.
+   * @param sessionId - Attendance session id
+   */
   async getStats(sessionId: string) {
     const session = await this.prisma.attendanceSession.findUnique({
       where: {
@@ -258,6 +311,10 @@ export class AttendancesService {
     };
   }
 
+  /**
+   * Update a single attendance record. Ensures the requesting user owns
+   * the course (teacher) before allowing updates.
+   */
   async updateSessionRecord(
     id: string,
     updateAttendanceRecordDto: UpdateAttendanceRecordDto,
@@ -274,6 +331,7 @@ export class AttendancesService {
             course: {
               select: {
                 teacherId: true,
+                semester: true,
               },
             },
           },
@@ -297,6 +355,7 @@ export class AttendancesService {
           present: updateAttendanceRecordDto.present,
         },
       });
+      await clearCachedAdminStats(record.session.course.semester);
       return updatedRecord;
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
@@ -307,10 +366,14 @@ export class AttendancesService {
         }
       }
       console.error('Error updating attendance record:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Fetch attendance records for a particular student in a course.
+   */
   async getStudentRecords(courseId: string, studentId: string) {
     try {
       const records = await this.prisma.attendanceRecord.findMany({
@@ -336,7 +399,8 @@ export class AttendancesService {
         }
       }
       console.error('Error fetching student attendance records:', error);
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 }

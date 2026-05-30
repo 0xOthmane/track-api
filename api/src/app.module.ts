@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
@@ -11,14 +16,13 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { validate } from './lib/env';
 import { UsersModule } from './users/users.module';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
-import { redis } from './lib/redis';
-import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { CoursesModule } from './courses/courses.module';
 import { GradesModule } from './grades/grades.module';
-import { env } from './config/env.config';
+import { getEnv } from './config/env.config';
 import { AttendancesModule } from './attendances/attendances.module';
+import { AdminModule } from './admin/admin.module';
+import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
 
 @Module({
   imports: [
@@ -42,32 +46,24 @@ import { AttendancesModule } from './attendances/attendances.module';
     AppLoggerModule,
     PrismaModule,
     UsersModule,
-    ThrottlerModule.forRoot({
-      throttlers: [
-        {
-          ttl: 60000,
-          limit: 10,
-        },
-      ],
-      storage: new ThrottlerStorageRedisService(redis),
-    }),
     BullModule.forRoot({
       connection: {
-        host: env.REDIS_HOST,
-        port: env.REDIS_PORT,
+        host: getEnv().REDIS_HOST,
+        port: getEnv().REDIS_PORT,
       },
     }),
     CoursesModule,
     GradesModule,
     AttendancesModule,
+    AdminModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    {
-      provide: 'APP_GUARD',
-      useClass: ThrottlerGuard,
-    },
-  ],
+  providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RateLimitMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

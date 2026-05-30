@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { CreateEvaluationWeightDto } from './dto/create-evaluation-weight.dto';
@@ -22,6 +24,17 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * CoursesService
+   *
+   * Handles course lifecycle: create, update, delete, enrollment and
+   * management of evaluation weights. Enforces simple role-based checks
+   * for teachers and admins.
+   */
+
+  /**
+   * Create a new course. Teachers may only create courses for themselves.
+   */
   async create(createCourseDto: CreateCourseDto, user: User) {
     try {
       if (user.role === 'TEACHER' && user.id !== createCourseDto.teacherId) {
@@ -68,10 +81,14 @@ export class CoursesService {
           throw new NotFoundException('Teacher not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * List courses with cursor pagination.
+   */
   async findAll(params: CursorPaginationQuery) {
     const { cursor, limit } = params;
     const courses = await this.prisma.course.findMany({
@@ -92,6 +109,9 @@ export class CoursesService {
     };
   }
 
+  /**
+   * Get a single course by id.
+   */
   async findOne(id: string) {
     const course = await this.prisma.course.findUnique({
       where: { id },
@@ -107,6 +127,9 @@ export class CoursesService {
     });
   }
 
+  /**
+   * Update course metadata.
+   */
   async update(id: string, updateCourseDto: UpdateCourseDto) {
     try {
       const course = await this.prisma.course.update({
@@ -125,10 +148,14 @@ export class CoursesService {
           throw new NotFoundException('Teacher not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Delete a course.
+   */
   async remove(id: string) {
     try {
       const course = await this.prisma.course.delete({
@@ -146,10 +173,14 @@ export class CoursesService {
           throw new NotFoundException('Course not found');
         }
       }
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Enroll a student into a course, enforcing capacity and role checks.
+   */
   async enroll(courseId: string, studentId: string) {
     try {
       const enrollment = await this.prisma.$transaction(async (tx) => {
@@ -217,10 +248,14 @@ export class CoursesService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Add an evaluation weight for a course. Ensures total weights <= 100.
+   */
   async addWeight(courseId: string, dto: CreateEvaluationWeightDto) {
     await this.ensureCourseExists(courseId);
 
@@ -252,10 +287,14 @@ export class CoursesService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Update a specific evaluation weight for a course.
+   */
   async updateWeight(
     courseId: string,
     weightId: string,
@@ -297,10 +336,14 @@ export class CoursesService {
         }
       }
 
-      throw error;
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException();
     }
   }
 
+  /**
+   * Remove an evaluation weight from a course.
+   */
   async deleteWeight(courseId: string, weightId: string) {
     const existing = await this.prisma.evaluationWeight.findFirst({
       where: { id: weightId, courseId },
@@ -319,6 +362,11 @@ export class CoursesService {
     });
   }
 
+  /**
+   * Ensure a course with the given id exists. Throws `NotFoundException`
+   * when the course is missing.
+   * @param courseId - Course identifier
+   */
   private async ensureCourseExists(courseId: string) {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
@@ -329,7 +377,11 @@ export class CoursesService {
       throw new NotFoundException('Course not found');
     }
   }
-
+  /**
+   * Compute the total of all evaluation weights for a course.
+   * @param courseId - Course identifier
+   * @returns numeric sum of weights (0 if none)
+   */
   private async getWeightsTotal(courseId: string) {
     const total = await this.prisma.evaluationWeight.aggregate({
       where: { courseId },
