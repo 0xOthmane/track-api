@@ -11,6 +11,8 @@ export const envSchema = z.object({
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   LOG_LEVEL: z.string().default('info'),
+  LOKI_URL: z.url().optional(),
+  LOKI_APP_NAME: z.string().default('track-api'),
 });
 
 export type Env = z.infer<typeof envSchema>;

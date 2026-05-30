@@ -43,6 +43,8 @@ Copy or reference `.env` values from `.env.sample` (see below). Key environment 
 - `REDIS_HOST` - Redis host (default: `localhost`)
 - `REDIS_PORT` - Redis port (default: `6379`)
 - `LOG_LEVEL` - Logging level (default: `info`)
+- `LOKI_URL` - Loki base URL used by `pino-loki` in production (optional)
+- `LOKI_APP_NAME` - Service label attached to Loki logs (default: `track-api`)
 
 Create a `.env` in this folder or provide the variables in your environment before running the app.
 
@@ -98,6 +100,29 @@ $ npm run test:e2e
 
 # test coverage
 $ npm run test:cov
+```
+
+## Docker Compose (API + Postgres + Redis + Loki + Grafana)
+
+From the repository root:
+
+```bash
+$ docker compose up --build -d
+```
+
+Services:
+
+- API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/api/docs`
+- Loki: `http://localhost:3100`
+- Grafana: `http://localhost:3001` (`admin` / `admin`)
+
+The API container runs `prisma migrate deploy` before booting the app. In production mode, logs are shipped directly to Loki via `pino-loki` and can be explored in Grafana (`Explore` -> `Loki` datasource).
+
+To stop and remove containers:
+
+```bash
+$ docker compose down
 ```
 
 ## Deployment
