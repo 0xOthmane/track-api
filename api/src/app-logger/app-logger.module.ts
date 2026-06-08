@@ -3,20 +3,37 @@ import { LoggerModule } from 'nestjs-pino';
 import { AppLoggerService } from './app-logger.service';
 import { getEnv } from '../config/env.config';
 
+const env = getEnv();
+
+const devTransport = {
+  target: 'pino-pretty',
+  options: {
+    colorize: true,
+    singleLine: true,
+  },
+};
+
+const prodTransport = env.LOKI_URL
+  ? {
+      target: 'pino-loki',
+      options: {
+        host: env.LOKI_URL,
+        labels: {
+          app: env.LOKI_APP_NAME,
+          env: env.NODE_ENV,
+        },
+        batching: true,
+        interval: 5,
+      },
+    }
+  : undefined;
+
 @Module({
   imports: [
     LoggerModule.forRoot({
       pinoHttp: {
-        transport: getEnv().NODE_ENV !== 'production'
-          ? {
-                target: 'pino-pretty',
-                options: {
-                  colorize: true,
-                  singleLine: true,
-                },
-              }
-          : undefined,
-        level: getEnv().LOG_LEVEL,
+        transport: env.NODE_ENV !== 'production' ? devTransport : prodTransport,
+        level: env.LOG_LEVEL,
         redact: [
           'req.headers.authorization',
           'req.headers.cookie',

@@ -81,3 +81,17 @@ npm run create:admin -- admin@example.com supersecret "Admin Name"
 
 - **API docs (Swagger):** visit `http://localhost:3000/api/docs` after starting the server.
 - **Repository API:** See `api/README.md` for full setup and runtime instructions.
+
+### Docker stack
+
+Start API + Postgres + Redis + Loki + Grafana:
+
+```bash
+docker compose up --build -d
+```
+
+Then open:
+
+- API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/api/docs`
+- Grafana: `http://localhost:3001` (admin/admin)

@@ -16,6 +16,8 @@ export function getEnv(): Env {
         PORT: process.env.PORT ? Number(process.env.PORT) : 3000,
         DATABASE_URL: process.env.DATABASE_URL ?? '',
         LOG_LEVEL: process.env.LOG_LEVEL ?? 'info',
+        LOKI_URL: process.env.LOKI_URL,
+        LOKI_APP_NAME: process.env.LOKI_APP_NAME ?? 'track-api',
         REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
         REDIS_PORT: process.env.REDIS_PORT
           ? Number(process.env.REDIS_PORT)
